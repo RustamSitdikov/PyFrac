@@ -124,9 +124,9 @@ def reconstruct_front(dist, EltChannel, mesh):
 #                a3       = np.arccos(abs(minx-miny)/(mesh.hx**2+mesh.hy**2)**0.5)-np.arctan(mesh.hy/mesh.hx)
 
             # !!!Hack. this check of zero or 90 degree angle works better
-            if abs(1 - dist[neighbors[0]]/dist[neighbors[1]]) < 1e-8:
+            if abs(1 - dist[neighbors[0]]/dist[neighbors[1]]) < 1e-10:
                 a2 = np.pi/2
-            elif abs(1 - dist[neighbors[2]]/dist[neighbors[3]]) < 1e-8:
+            elif abs(1 - dist[neighbors[2]]/dist[neighbors[3]]) < 1e-10:
                 a2 = 0
 
             # checks to remove numerical noise in angle calculation

@@ -28,12 +28,16 @@ from src.Properties import *
 from src.FractureFrontLoop import *
 
 # creating mesh
-Mesh = CartesianMesh(3, 3, 41, 41)
+Mesh = CartesianMesh(40, 40, 61, 61)
 
 # solid properties
 nu = 0.4
 Eprime = 3.3e10 / (1 - nu ** 2)
-K_Ic = 0.005e6
+K_Ic = 0.3e6*np.ones((Mesh.NumberOfElts,),dtype=np.float64)
+highKIC = np.where(abs(Mesh.CenterCoor[:,1])>10)[0]
+K_Ic[highKIC] = 3.2e6
+highKIC = np.where(abs(Mesh.CenterCoor[:,1])>20)[0]
+K_Ic[highKIC] = 0.3e6
 sigma0 = 0 * 1e6
 Solid = MaterialProperties(Eprime, K_Ic, 0., sigma0, Mesh)
 
@@ -47,16 +51,17 @@ Fluid = FluidProperties(1.1e-3, Mesh, turbulence=False)
 
 # simulation properties
 simulProp = SimulationParameters(tip_asymptote="U",
-                                 output_time_period=0.005,
+                                 output_time_period=2,
                                  plot_figure=True,
                                  save_to_disk=False,
                                  out_file_address=".\\Data\\TurbLamTough",
                                  plot_analytical=True,
-                                 cfl_factor=0.4)
+                                 cfl_factor=0.2,
+                                 analytical_sol="M")
 
 
 # initializing fracture
-initRad = 0.8 # initial radius of fracture
+initRad = 6.5 # initial radius of fracture
 Fr = Fracture(Mesh, Fluid, Solid) # create fracture object
 Fr.initialize_radial_Fracture(initRad,
                               'radius',
@@ -84,7 +89,7 @@ while (Fr.time < Tend) and (i < MaximumTimeSteps):
 
     TimeStep = simulProp.CFLfactor * Fr.mesh.hx / np.mean(Fr.v)
     status, Fr_k = attempt_time_step(Fr_k, C, Solid, Fluid, simulProp, Injection, TimeStep)
-
+    # Fr_k.plot_fracture("complete","width")
     Fr = copy.deepcopy(Fr_k)
 
 

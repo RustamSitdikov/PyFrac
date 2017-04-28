@@ -195,3 +195,28 @@ def StressIntensityFactor(w, lvlSetData, EltTip, EltRibbon, stagnant, mesh, Epri
                 KIPrime[i] = w[closest] * Eprime / (-lvlSetData[closest]) ** 0.5
 
     return KIPrime
+
+def calculate_Velocity(Frac, regime, mat_prop, fluid_prop):
+    """
+    This function calculate the velocity of the front in ribbon cells by inverting the tip asymptote.
+    
+    Arguments:
+        Frac (Fracture object):                 the fracture object giving the width and the ribbon cells.
+        regime (string):                        the tip asymptote to be inverted. Possible options
+                                                    "M-K" -- M to K tip asymptote (see e.g. Peirce, Comput. Methods.
+                                                             Appl. Mech. Engg., 2015)
+                                                    "M"   -- viscosity asymptote
+        mat_prop (MaterialProperties object):   material properties
+        fluid_prop (FluidProperties object):    fluid properties
+        
+    Returns:
+        ndarray-float:                          fracture front velocity for each of the ribbon element 
+    """
+    if regime == "M-K":
+        return (mat_prop.Eprime**3 * Frac.w[Frac.EltRibbon]**3 - mat_prop.Kprime[Frac.EltRibbon]**3 * abs(
+            Frac.sgndDist[Frac.EltRibbon])**(3/2)) / (18 * 3**0.5 * mat_prop.Eprime**2 * abs(
+            Frac.sgndDist[Frac.EltRibbon])**2 * fluid_prop.muPrime)
+    
+    elif regime == "M":
+        return mat_prop.Eprime * Frac.w[Frac.EltRibbon]**3 / (18 * 3**0.5 * abs(Frac.sgndDist[Frac.EltRibbon])**2 *
+                                                              fluid_prop.muPrime)

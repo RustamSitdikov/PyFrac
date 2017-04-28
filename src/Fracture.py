@@ -325,7 +325,7 @@ class Fracture():
         self.Ffront = np.concatenate((I, J), axis=1)
         self.CellStatus = CellStatus
         self.InCrack = InCrack
-        self.v = v * np.ones((len(self.l)), float) # uniform velocity for all the tip elements
+        self.v = v * np.ones((self.mesh.NumberOfElts,), dtype=np.float64) # uniform velocity for all the cells
 
         # assigning ZeroVertex 0, 1, 2, or 3 according to the sign of the cell center coordinates. For example, cells
         # with both the x and y axis positive will get 0(signifying the bottom left vertex) as the zero vertex.
