@@ -62,15 +62,7 @@ def SolveFMM(T, EltRibbon, EltChannel,mesh):
                         T[neighbor] = NeigyMin+mesh.hy
                     if NeigyMin>maxdist:
                         T[neighbor] = NeigxMin+mesh.hx    
-                         #### numerical root finding    
-#                            TSten   = np.empty(Stencil.shape)
-#                            TSten[~np.isnan(Stencil)] = T[np.asarray(Stencil[~np.isnan(Stencil)],dtype=np.int)]
-#                            TSten[np.isnan(Stencil)]  = 1000           
-#                            Eikargs         = (TSten[0], TSten[1], TSten[2], TSten[3], 1, mesh.hx, mesh.hy)     #arguments for the eikinal equation function
-#                            guess           = np.max(TSten)             # initial starting guess for the numerical solver
-#                            T[neighbor]     = fsolve(Eikonal, guess, args=Eikargs)          #numerical solver
-##                            print('Elem '+repr(neighbor)+' T= '+repr(T[neighbor]))
-                            
+
         Alive      = np.append(Alive,SmallestT)
         NarrowBand = np.delete(NarrowBand,np.where(NarrowBand==SmallestT))
 #    notEvaltd = np.where(T>maxdist)[0]
@@ -85,9 +77,9 @@ def reconstruct_front(dist, EltChannel, mesh):
     perpendicular.
     
     Arguments:
-        dist (ndarray-float): the signed distance of the cells from the fracture front
-        EltChannel (ndarray-int): list of Channel elements
-        mesh (CartesianMesh object): the mesh of the fracture
+        dist (ndarray-float):           the signed distance of the cells from the fracture front
+        EltChannel (ndarray-int):       list of Channel elements
+        mesh (CartesianMesh object):    the mesh of the fracture
     """
 
     # Elements that are not in channel
@@ -155,7 +147,7 @@ def reconstruct_front(dist, EltChannel, mesh):
     
 
 ################################# 
-# what is the goal of this one below....
+
 def UpdateLists(EltsChannel, EltsTipNew, FillFrac, Dist, mesh):
     """Update the Element lists"""
 
@@ -209,10 +201,16 @@ def UpdateLists(EltsChannel, EltsTipNew, FillFrac, Dist, mesh):
         if drctx>0 and drcty>0:
             direction[i] = 2
 
-    eltsRibbon = np.unique(eltsRibbon)
+
     for i in range(0,len(eltsTip)):
         eltsRibbon = np.delete(eltsRibbon,np.where(eltsRibbon==eltsTip[i]))
-    
+
+        # !!! to be checked if necessary or not
+        if (mesh.NeiElements[eltsTip[i],0] in eltsRibbon) and (mesh.NeiElements[eltsTip[i],2] in eltsRibbon):
+            eltsRibbon = np.append(eltsRibbon, mesh.NeiElements[mesh.NeiElements[eltsTip[i],2], 0])
+
+    eltsRibbon = np.unique(eltsRibbon)
+
     CellStatusNew             = np.zeros((mesh.NumberOfElts),int)  
     CellStatusNew[eltsChannel] = 1
     CellStatusNew[eltsTip]     = 2

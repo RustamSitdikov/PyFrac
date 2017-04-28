@@ -216,7 +216,7 @@ def calculate_Velocity(Frac, regime, mat_prop, fluid_prop):
         return (mat_prop.Eprime**3 * Frac.w[Frac.EltRibbon]**3 - mat_prop.Kprime[Frac.EltRibbon]**3 * abs(
             Frac.sgndDist[Frac.EltRibbon])**(3/2)) / (18 * 3**0.5 * mat_prop.Eprime**2 * abs(
             Frac.sgndDist[Frac.EltRibbon])**2 * fluid_prop.muPrime)
-    
+
     elif regime == "M":
         return mat_prop.Eprime * Frac.w[Frac.EltRibbon]**3 / (18 * 3**0.5 * abs(Frac.sgndDist[Frac.EltRibbon])**2 *
                                                               fluid_prop.muPrime)

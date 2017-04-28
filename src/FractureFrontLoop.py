@@ -89,6 +89,7 @@ def attempt_time_step(Frac, C, Material_properties, Fluid_properties, Simulation
         print("Reattempting with time step of " + repr(
             TimeStep * Simulation_Parameters.reAttemptFactor ** (i + 1)) + " sec")
     Frac.plot_fracture("complete", "footPrint")
+    plt.show()
     raise SystemExit("Propagation not successful. Exiting...")
 
 
@@ -185,8 +186,8 @@ def FractureFrontLoop(Frac, C, Material_properties, Fluid_properties, Simulation
                                 Frac.mesh,
                                 'A',
                                 Material_properties,
-                                Frac.muPrime,
-                                Vel_k[EltsTipNew]) / Frac.mesh.EltArea
+                                Frac.muPrime
+                                ) / Frac.mesh.EltArea
 
     # todo !!! Hack: This check rounds the filling fraction to 1 if it is not bigger than 1 + 1e-6 (up to 6 figures)
     FillFrac_k[np.logical_and(FillFrac_k > 1.0, FillFrac_k < 1 + 1e-6)] = 1.0

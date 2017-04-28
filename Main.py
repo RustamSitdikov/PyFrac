@@ -34,10 +34,10 @@ Mesh = CartesianMesh(40, 40, 61, 61)
 nu = 0.4
 Eprime = 3.3e10 / (1 - nu ** 2)
 K_Ic = 0.3e6*np.ones((Mesh.NumberOfElts,),dtype=np.float64)
-highKIC = np.where(abs(Mesh.CenterCoor[:,1])>10)[0]
-K_Ic[highKIC] = 3.2e6
-highKIC = np.where(abs(Mesh.CenterCoor[:,1])>20)[0]
-K_Ic[highKIC] = 0.3e6
+# highKIC = np.where(abs(Mesh.CenterCoor[:,1])>10)[0]
+# K_Ic[highKIC] = 4e6
+# highKIC = np.where(abs(Mesh.CenterCoor[:,1])>20)[0]
+# K_Ic[highKIC] = 0.3e6
 sigma0 = 0 * 1e6
 Solid = MaterialProperties(Eprime, K_Ic, 0., sigma0, Mesh)
 
@@ -51,12 +51,12 @@ Fluid = FluidProperties(1.1e-3, Mesh, turbulence=False)
 
 # simulation properties
 simulProp = SimulationParameters(tip_asymptote="U",
-                                 output_time_period=2,
+                                 output_time_period=5,
                                  plot_figure=True,
                                  save_to_disk=False,
                                  out_file_address=".\\Data\\TurbLamTough",
                                  plot_analytical=True,
-                                 cfl_factor=0.2,
+                                 cfl_factor=0.5,
                                  analytical_sol="M")
 
 
