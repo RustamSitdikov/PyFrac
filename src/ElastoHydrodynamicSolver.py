@@ -56,10 +56,10 @@ def finiteDiff_operator_laminar(w, EltCrack, muPrime, Mesh, InCrack):
 
     return FinDiffOprtr
 
+
 #-----------------------------------------------------------------------------------------------------------------------
 
-
-def FiniteDiff_operator_turbulent_implicit(w, EltCrack, mu, Mesh, InCrack, rho, vkm1, C, sigma0, dgrain=1e-6):
+def FiniteDiff_operator_turbulent_implicit(w, EltCrack, mu, Mesh, InCrack, rho, vkm1, C, sigma0, dgrain):
     """
     The function evaluate the finite difference matrix, i.e. the A matrix in the ElastoHydrodynamic equations ( see e.g.
     Dontsov and Peirce 2008). THe matrix is evaluated by taking turbulence into account. The friction factor for 
@@ -89,8 +89,8 @@ def FiniteDiff_operator_turbulent_implicit(w, EltCrack, mu, Mesh, InCrack, rho, 
     dy = Mesh.hy
 
     # todo: can be evaluated at each cell edge
-    rough = w[EltCrack]/dgrain
-    rough[np.where(rough < 3)[0]] = 3.
+    rough = w[EltCrack]/(2*dgrain)
+    # rough[np.where(rough < 3)[0]] = 3.
 
     # width on edges; evaluated by averaging the widths of adjacent cells
     wLftEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 0]]) / 2
@@ -258,11 +258,12 @@ def Velocity_Residual(v,*args):
     """
     (w, mu, rho, dp, rough) = args
 
-    # Reynolds number
+    # # Reynolds number
     Re = 4/3 * rho * w * v / mu
 
     # friction factor using Yang-Joseph approximation
-    f = friction_factor(Re,rough)
+    f = 0.143/4 * rough**(-1/3)
+    # f = 16./Re
 
     return v-w*dp/(v*rho*f)
 
@@ -292,7 +293,7 @@ def findBracket(func,guess,*args):
 
 def MakeEquationSystemExtendedFP(solk, vkm1, *args):
     (EltChannel, EltsTipNew, wLastTS, wTip, EltCrack, Mesh, dt, Q, C, muPrime, rho, InCrack, LeakOff, sigma0,
-     turb) = args
+     turb, dgrain) = args
 
     Ccc = C[np.ix_(EltChannel, EltChannel)]
     Cct = C[np.ix_(EltChannel, EltsTipNew)]
@@ -307,7 +308,7 @@ def MakeEquationSystemExtendedFP(solk, vkm1, *args):
 
     if turb:
         (FinDiffOprtr, vk) = FiniteDiff_operator_turbulent_implicit(wcNplusOne, EltCrack, muPrime/12, Mesh, InCrack,
-                                                                    rho, vkm1, C, sigma0)
+                                                                    rho, vkm1, C, sigma0, dgrain)
     else:
         FinDiffOprtr = finiteDiff_operator_laminar(wcNplusOne, EltCrack, muPrime, Mesh, InCrack)
         vk = vkm1
@@ -339,13 +340,13 @@ def MakeEquationSystemExtendedFP(solk, vkm1, *args):
 ######################################
 #
 def MakeEquationSystemSameFP(delwk, vkm1, *args):
-    (w, EltCrack, Q, C, dt, muPrime, mesh, InCrack, LeakOff, sigma0, rho, turb) = args
+    (w, EltCrack, Q, C, dt, muPrime, mesh, InCrack, LeakOff, sigma0, rho, turb, dgrain) = args
     wnPlus1 = np.copy(w)
     wnPlus1[EltCrack] = wnPlus1[EltCrack] + delwk
 
     if turb:
         (con, vk) = FiniteDiff_operator_turbulent_implicit(wnPlus1, EltCrack, muPrime / 12, mesh, InCrack, rho, vkm1,
-                                                           C, sigma0)
+                                                           C, sigma0, dgrain)
     else:
         con = finiteDiff_operator_laminar(wnPlus1, EltCrack, muPrime, mesh, InCrack)
         vk = vkm1

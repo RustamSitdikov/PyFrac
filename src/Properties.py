@@ -23,11 +23,11 @@ class MaterialProperties:
         Kprime (ndarray-float)  : 4*(2/pi)**0.5 * K1c 
         Cprime (ndarray-float)  : 2 * Carter's leak off coefficient
         SigmaO (ndarray-float)  : in-situ stress field
-        
+        grainSize (float)       : grain size of the material. Used to calculate friction factor in rough flow regime
     methods:
     """
 
-    def __init__(self, Eprime, Toughness, Cl, SigmaO, Mesh):  # add Mesh as input directly here.
+    def __init__(self, Eprime, Toughness, Cl, SigmaO, Mesh, grain_size=0):  # add Mesh as input directly here.
 
         if isinstance(Eprime, np.ndarray):  # check if float or ndarray
             print("Eprime  can not be an array as input ! - homogeneous medium only ")
@@ -63,6 +63,8 @@ class MaterialProperties:
                 return
         else:
             self.SigmaO = SigmaO * np.ones((Mesh.NumberOfElts,), float)
+
+        self.grainSize = grain_size
 
 
 # --------------------------------------------------------------------------------------------------------
@@ -198,7 +200,7 @@ class SimulationParameters:
         self.FinalTime = final_time
 
         # todo: all the option structures can be put into one file
-        tipAssymptOptions = ("K", "M", "Mt", "U", "M-K")
+        tipAssymptOptions = ("K", "M", "Mt", "U", "M-K", "T")
         if tip_asymptote in tipAssymptOptions:  # check if tip asymptote matches any option
             self.tipAsymptote = tip_asymptote
         else:

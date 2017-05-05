@@ -219,6 +219,7 @@ def injection_same_footprint(Fr_lstTmStp, C, timeStep, Qin, mat_properties, Flui
 
     # average injected fluid over footprint taken as [\delta] W guess for the iterative solver
     delwGuess = timeStep * sum(Qin) / Fr_lstTmStp.EltCrack.size * np.ones((Fr_lstTmStp.EltCrack.size,), float)
+    # delwGuess = 1e-10*np.ones((Fr_lstTmStp.EltCrack.size,), float)
 
     # todo: leak off is assumed zero.
     DLkOff = np.zeros((Fr_lstTmStp.mesh.NumberOfElts,), float)
@@ -247,7 +248,8 @@ def injection_same_footprint(Fr_lstTmStp, C, timeStep, Qin, mat_properties, Flui
         Fr_lstTmStp.InCrack,
         DLkOff, mat_properties.SigmaO,
         Fluid_properties.density,
-        Fluid_properties.turbulence
+        Fluid_properties.turbulence,
+        mat_properties.grainSize
         )
 
     # typical values of the variable. Used to calculate Jacobian (see Piccard_Newton function)
@@ -324,6 +326,7 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
                                                           Fr_lstTmStp,
                                                           Material_properties,
                                                           sim_parameters,
+                                                          Fluid_properties,
                                                           timeStep)
 
     # if tip inversion returns nan
@@ -506,7 +509,8 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
         InCrack_k,
         DLkOff,
         Fr_lstTmStp.SigmaO,
-        Fluid_properties.turbulence)
+        Fluid_properties.turbulence,
+        Material_properties.grainSize)
 
     # sloving the system of equations for [\delta] w in the channel elements and pressure in the tip elements
     (sol, vel) = Picard_Newton(Elastohydrodynamic_ResidualFun_ExtendedFP,
@@ -554,6 +558,8 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
     # # plot Reynold's number
     # plot_Reynolds_number(Fr_kplus1, ReNumb, 1)
 
+    # Fr_kplus1.plot_fracture("complete", "footPrint")
+    # plt.show()
     exitstatus = 1
     return exitstatus, Fr_kplus1
 

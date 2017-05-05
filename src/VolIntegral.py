@@ -105,7 +105,7 @@ def Pdistance(x, y, slope, intercpt):
     return (slope * x - y + intercpt) / (slope ** 2 + 1) ** 0.5;
 
 
-def VolumeTriangle(dist, em, regime, Kprime, Eprime, muPrime, Cbar, Vel, stagnant, KIPrime):
+def VolumeTriangle(dist, em, regime, Kprime, Eprime, muPrime, Cbar, Vel, stagnant, KIPrime, dgrain, density):
     """Volume  of the triangle defined by perpendicular distance (dist) and em (em=1/sin(alpha)cos(alpha), where alpha is the angle of the perpendicular)
     The regime variable identifies the propagation regime    
     """
@@ -139,8 +139,12 @@ def VolumeTriangle(dist, em, regime, Kprime, Eprime, muPrime, Cbar, Vel, stagnan
         dist) ** 0.5 * Eprime ** 2 * Kprime ** 12 * muPrime * Vel + 2868.2761373340604 * dist * Eprime ** 4 * Kprime ** 9 * muPrime ** 2 * Vel ** 2 - 24624. * dist ** 1.5 * Eprime ** 6 * Kprime ** 6 * muPrime ** 3 * Vel ** 3 + 464660.73424811783 * dist ** 2 * Eprime ** 8 * Kprime ** 3 * muPrime ** 4 * Vel ** 4 + 5.7316896e7 * dist ** 2.5 * Eprime ** 10 * muPrime ** 5 * Vel ** 5))) / (
                Eprime ** 11 * muPrime ** 5 * Vel ** 5)
 
+    elif regime == 'T':
+        return 0.16259351237135466 * em * (dgrain**(1/3) * Vel**2 * density / Eprime)**(3/7) * dist**(20/7)
 
-def Area(dist, regime, Kprime, Eprime, muPrime, Cbar, Vel, stagnant, KIPrime):
+
+
+def Area(dist, regime, Kprime, Eprime, muPrime, Cbar, Vel, stagnant, KIPrime, dgrain, density):
     """Gives Area under the tip depending on the regime identifier ;  
     used in case of 0 or 90 degree angle; can be used for 1d case"""
     if regime == 'A':
@@ -171,8 +175,11 @@ def Area(dist, regime, Kprime, Eprime, muPrime, Cbar, Vel, stagnant, KIPrime):
                 81648. * dist ** 1.5 * Eprime ** 6 * muPrime ** 3 * Vel ** 3)))) / (
                 Eprime ** 7 * muPrime ** 3 * Vel ** 3)
 
+    elif regime == 'T':
+        return 0.46455289248958476 * (dgrain**(1/3) * Vel**2 * density / Eprime)**(3/7) * dist**(13/7)
 
-def VolumeIntegral(EltTip, alpha, l, mesh, regime, mat_prop, muPrime, Vel, stagnant=[], KIPrime=[]):
+
+def VolumeIntegral(EltTip, alpha, l, mesh, regime, mat_prop, muPrime, Vel, stagnant=[], KIPrime=[], density=1000):
     """Calculate Volume integrals of the grid cells according to the tip assymptote given by the variable regime"""
     if len(stagnant) == 0:
         stagnant = np.zeros((alpha.size,), bool)
@@ -188,32 +195,34 @@ def VolumeIntegral(EltTip, alpha, l, mesh, regime, mat_prop, muPrime, Vel, stagn
         if abs(alpha[i]) < 1e-8:
             if l[i] <= mesh.hx:
                 volume[i] = Area(l[i], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i],
-                                 Vel[i], stagnant[i], KIPrime[i]) * mesh.hy
+                                 Vel[i], stagnant[i], KIPrime[i], mat_prop.grainSize, density) * mesh.hy
             else:
                 volume[i] = (Area(l[i], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i],
-                                  Vel[i], stagnant[i], KIPrime[i]) - Area(l[i] - mesh.hx, regime, Kprime[i],
-                                  mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i], stagnant[i], KIPrime[i])) * mesh.hy
+                                  Vel[i], stagnant[i], KIPrime[i], mat_prop.grainSize, density) - Area(l[i] - mesh.hx,
+                                  regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i], stagnant[i],
+                                  KIPrime[i], mat_prop.grainSize, density)) * mesh.hy
 
         elif abs(alpha[i] - np.pi / 2) < 1e-8:
             if l[i] <= mesh.hy:
                 volume[i] = Area(l[i], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i], stagnant[i],
-                                 KIPrime[i]) * mesh.hx
+                                 KIPrime[i], mat_prop.grainSize, density) * mesh.hx
             else:
                 volume[i] = (Area(l[i], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i], stagnant[i],
-                                  KIPrime[i]) - Area(l[i] - mesh.hy, regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i],
-                                                     Cprime[i], Vel[i], stagnant[i], KIPrime[i])) * mesh.hx
+                                  KIPrime[i], mat_prop.grainSize, density) - Area(l[i] - mesh.hy, regime, Kprime[i],
+                                  mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i], stagnant[i], KIPrime[i],
+                                  mat_prop.grainSize, density)) * mesh.hx
         else:
             yIntrcpt = l[i] / np.cos(np.pi / 2 - alpha[i])
             grad = -1 / np.tan(alpha[i])
             m = 1 / (np.sin(alpha[i]) * np.cos(alpha[i]))
 
             TriVol = VolumeTriangle(l[i], m, regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i],
-                                    stagnant[i], KIPrime[i])
+                                    stagnant[i], KIPrime[i], mat_prop.grainSize, density)
 
             lUp = Pdistance(0, mesh.hy, grad, yIntrcpt)  # distance of the front from the upper left vertex of the grid cell
             if lUp > 0:  # upper vertex of the triangle is higher than the grid cell height
                 UpTriVol = VolumeTriangle(lUp, m, regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i],
-                                          stagnant[i], KIPrime[i])
+                                          stagnant[i], KIPrime[i], mat_prop.grainSize, density)
             else:
                 UpTriVol = 0
 
@@ -221,7 +230,7 @@ def VolumeIntegral(EltTip, alpha, l, mesh, regime, mat_prop, muPrime, Vel, stagn
                             yIntrcpt)  # distance of the front from the lower right vertex of the grid cell
             if lRt > 0:  # right vertex of the triangle is wider than the grid cell width
                 RtTriVol = VolumeTriangle(lRt, m, regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i],
-                                          stagnant[i], KIPrime[i])
+                                          stagnant[i], KIPrime[i], mat_prop.grainSize, density)
             else:
                 RtTriVol = 0
 
@@ -229,7 +238,7 @@ def VolumeIntegral(EltTip, alpha, l, mesh, regime, mat_prop, muPrime, Vel, stagn
                                        yIntrcpt)  # distance of the front from the upper right vertex of the grid cell
             if IntrsctTriDist > 0:  # front has passed the grid cell
                 IntrsctTri = VolumeTriangle(IntrsctTriDist, m, regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i],
-                                            Cprime[i], Vel[i], stagnant[i], KIPrime[i])
+                                            Cprime[i], Vel[i], stagnant[i], KIPrime[i], mat_prop.grainSize, density)
             else:
                 IntrsctTri = 0
 

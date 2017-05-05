@@ -67,7 +67,7 @@ def TipAsym_Universal_delt_Res(dist, *args):
 
 def TipAsym_Universal_zero_Res(dist, *args):
     """Function to be minimized to find root for universal Tip assymptote (see Donstov and Pierce 2017)"""
-    (wEltRibbon, Kprime, Eprime, muPrime, Cbar, DistLstTSEltRibbon, dt) = args
+    (wEltRibbon, Kprime, Eprime, muPrime, Cbar, DistLstTSEltRibbon, dt, k, rho) = args
 
     Vel = (dist - DistLstTSEltRibbon) / dt
     Kh = Kprime * dist ** 0.5 / (Eprime * wEltRibbon)
@@ -90,7 +90,14 @@ def TipAsym_MKTransition_Res(dist, *args):
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def FindBracket_dist(w, EltRibbon, Kprime, Eprime, muPrime, Cprime, DistLstTS, dt, ResFunc):
+def TipAsym_PowerLaw_Res(dist, *args):
+
+    (wEltRibbon, Kprime, Eprime, muPrime, Cbar, DistLstTSEltRibbon, dt, k, rho) = args
+    Vel = (dist - DistLstTSEltRibbon) / dt
+
+    return wEltRibbon - 0.862741086052086 * (k**(1/3) * Vel**2 * rho / Eprime)**(3/7) * dist**(6/7)
+
+def FindBracket_dist(w, EltRibbon, Kprime, Eprime, muPrime, Cprime, DistLstTS, dt, ResFunc, dgrain, density):
     """ Find the valid bracket for the root evaluation function. Also returns list of ribbon cells that are not propagating"""
 
     stagnant = np.where(
@@ -103,7 +110,7 @@ def FindBracket_dist(w, EltRibbon, Kprime, Eprime, muPrime, Cprime, DistLstTS, d
     for i in range(0, len(moving)):
 
         TipAsmptargs = (w[EltRibbon[moving[i]]], Kprime[EltRibbon[moving[i]]], Eprime, muPrime[EltRibbon[moving[i]]],
-                        Cprime[EltRibbon[moving[i]]], -DistLstTS[EltRibbon[moving[i]]], dt)
+                        Cprime[EltRibbon[moving[i]]], -DistLstTS[EltRibbon[moving[i]]], dt, dgrain, density)
         Res_a = ResFunc(a[i], *TipAsmptargs)
         Res_b = ResFunc(b[i], *TipAsmptargs)
 
@@ -122,7 +129,7 @@ def FindBracket_dist(w, EltRibbon, Kprime, Eprime, muPrime, Cprime, DistLstTS, d
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def TipAsymInversion(w, frac, matProp, simParmtrs, dt=None):
+def TipAsymInversion(w, frac, matProp, simParmtrs, fluidProp, dt=None):
     """ 
     Evaluate distance from the front using tip assymptotics of the given regime, given the fracture width in the ribbon
     cells.
@@ -150,14 +157,16 @@ def TipAsymInversion(w, frac, matProp, simParmtrs, dt=None):
         ResFunc = TipAsym_MKTransition_Res
     elif simParmtrs.tipAsymptote == 'K':
         return w[frac.EltRibbon] ** 2 * (matProp.Eprime / matProp.Kprime[[frac.EltRibbon]]) ** 2
+    elif simParmtrs.tipAsymptote == 'T':
+        ResFunc = TipAsym_PowerLaw_Res
 
     (moving, a, b) = FindBracket_dist(w, frac.EltRibbon, matProp.Kprime, matProp.Eprime, frac.muPrime, matProp.Cprime,
-                                      frac.sgndDist, dt, ResFunc)
+                                      frac.sgndDist, dt, ResFunc, matProp.grainSize, fluidProp.density)
     dist = -frac.sgndDist[frac.EltRibbon]
     for i in range(0, len(moving)):
         TipAsmptargs = (w[frac.EltRibbon[moving[i]]], matProp.Kprime[frac.EltRibbon[moving[i]]], matProp.Eprime,
                         frac.muPrime[frac.EltRibbon[moving[i]]], matProp.Cprime[frac.EltRibbon[moving[i]]],
-                        -frac.sgndDist[frac.EltRibbon[moving[i]]], dt)
+                        -frac.sgndDist[frac.EltRibbon[moving[i]]], dt, matProp.grainSize, fluidProp.density)
         try:
             dist[moving[i]] = brentq(ResFunc, a[i], b[i], TipAsmptargs)
         except RuntimeError:

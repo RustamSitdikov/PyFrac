@@ -242,7 +242,10 @@ def friction_factor(Re, roughness):
         return FF_Yang_Dou(Re, roughness)
 
 def friction_factor_vector(Re,roughness):
-    ff = np.zeros((Re.size,),dtype=np.float64)
-    for i in range(0,Re.size):
-        ff[i] = friction_factor(Re[i], roughness[i])
-    return ff
+    # ff = np.zeros((Re.size,),dtype=np.float64)
+    # for i in range(0,Re.size):
+    #     ff[i] = friction_factor(Re[i], roughness[i])
+    # return ff
+
+    return 0.143/4 * roughness**(-1/3)
+    # return  16./Re
