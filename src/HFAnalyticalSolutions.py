@@ -337,3 +337,46 @@ def PKN_solution(Eprime, Q0, muPrime, Mesh, t, h):
     v = 0.01 * sol_l / (t1 - t)
 
     return (sol_l, p, w, v, PKN)
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+def PKN_solution_turb_smooth(Eprime, Q0, muPrime, Mesh, t, h, density):
+    """
+    Analytical solution for heigth contained hydraulic fracture (PKN geometry), given current time. The solution
+    does not take leak off into account. The fluid is assumed to be in fully turbulent, smooth regime
+
+    Arguments:
+        Eprime (float):         plain strain elastic modulus
+        Q0 (float):             injection rate
+        muPrime (float):        12*viscosity
+        Mesh (CartesianMesh):   a CartesianMesh class object describing the grid.
+        t (float):              the given time for which the solution is evaluated
+        h (float):              the height of the PKN fracture
+
+    Returns:
+        float:                  half length of the fracture at the given time 
+        ndarray-float:          pressure at the injection points 
+        ndarray-float:          width at the injection points
+        float:                  propagation velocity
+        
+    """
+
+    # length of the fracture at the given time
+    sol_l = 2**(11/20) / 5**(3/20) / np.pi**(9/20) * Eprime**(1/5) * Q0**(9/20) * t**(4/5) / ((0.316/4)**(1/5) *
+                                                    h**(13/20) * (muPrime/12)**(1/20) * density**(3/20)) * 1.099
+
+
+    # only the solution width in the middle
+    sol_w = 5**(3/20) * np.pi**(9/20) / 2 / 2**(11/20) * (0.316/4)**(1/5) * (muPrime/12)**(1/20) * Q0**(11/20) * density**(3/20) * t**(1/5) / (
+        Eprime**(1/5) * h**(7/20) * 1.288
+    )
+
+
+    # calculating pressure from width
+    p = 2 * Eprime * sol_w / (np.pi * h)
+
+    # todo !!!
+
+    v = 0
+
+    return (sol_l, p*np.ones((Mesh.NumberOfElts,),), sol_w*np.ones((Mesh.NumberOfElts,),), v)

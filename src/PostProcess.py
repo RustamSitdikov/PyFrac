@@ -19,7 +19,8 @@ from src.Utility import *
 
 
 def plot_data(address, plot_analytical=True, regime = "M", plot_w_cntr=True, fig_w_cntr=None, plot_r=True, fig_r=None,
-              plot_p_cntr=False, fig_p_cntr=None, maxFiles=150, loglog=True, plot_w_prfl=False, plot_p_prfl=False):
+              plot_p_cntr=False, fig_p_cntr=None, plot_volume=False, maxFiles=150, loglog=True, plot_w_prfl=False,
+              plot_p_prfl=False):
     """
     This function reads the saved files in the given folder and plots the figures that are enabled. Analytical solutions
     according to the given regime can also be plotted along with the numerical solution read from the saved files.
@@ -118,9 +119,9 @@ def plot_data(address, plot_analytical=True, regime = "M", plot_w_cntr=True, fig
         R_numrcl = np.append(R_numrcl, max((tipVrtxCoord[:, 0] ** 2 + tipVrtxCoord[:, 1] ** 2) ** 0.5 + Fr.l))
 
         # width at the injection point
-        w_numrcl_centr = np.append(w_numrcl_centr, Fr.w[injection.source_location])
+        w_numrcl_centr = np.append(w_numrcl_centr, Fr.w[Fr.mesh.CenterElts])
         # pressure at the injection point
-        p_numrcl_centr = np.append(p_numrcl_centr, Fr.p[injection.source_location])
+        p_numrcl_centr = np.append(p_numrcl_centr, Fr.p[Fr.mesh.CenterElts])
         # total volume inside the fracture
         vol_numrcl = np.append(vol_numrcl, sum(Fr.w) * Fr.mesh.EltArea)
 
@@ -138,9 +139,30 @@ def plot_data(address, plot_analytical=True, regime = "M", plot_w_cntr=True, fig
                                                                  injection.injectionRate[1, 0],
                                                                  Fr.mesh,
                                                                  Fr.time)
+            elif regime == "PKN":
+                (R_a, p_a, w_a, v_a, PKN) = PKN_solution(solid.Eprime,
+                                                         injection.injectionRate[1, 0],
+                                                         fluid.muPrime,
+                                                         Fr.mesh,
+                                                         Fr.time,
+                                                         2.48*2)
+                #R_numrcl[fileNo] -= Fr.mesh.hx
+            elif regime == "PKN-smooth":
+                (R_a, p_a, w_a, v_a) = PKN_solution_turb_smooth(solid.Eprime,
+                                                                injection.injectionRate[1, 0],
+                                                                fluid.muPrime,
+                                                                Fr.mesh,
+                                                                Fr.time,
+                                                                2.48*2,
+                                                                1000)
+                vrtcl = np.where(abs(Fr.mesh.CenterCoor[:, 0] - 0.0) < 1e-5)[0]
+                w_numrcl_centr[fileNo] = sum(Fr.w[vrtcl])* Fr.mesh.EltArea/(5*Fr.mesh.hx)
+                R_numrcl[fileNo] -= Fr.mesh.hx
+
+
             R_anltcl = np.append(R_anltcl, R_a)
-            w_anltcl_centr = np.append(w_anltcl_centr, w_a[injection.source_location])
-            p_anltcl_centr = np.append(p_anltcl_centr, p_a[injection.source_location])
+            w_anltcl_centr = np.append(w_anltcl_centr, w_a[Fr.mesh.CenterElts])
+            p_anltcl_centr = np.append(p_anltcl_centr, p_a[Fr.mesh.CenterElts])
             vol_anltcl = np.append(vol_anltcl, sum(w_a) * Fr.mesh.EltArea)
 
         # saving width of the cross section if plotting is enabled
@@ -170,6 +192,8 @@ def plot_data(address, plot_analytical=True, regime = "M", plot_w_cntr=True, fig
 
         fileNo += 1
 
+    Fr.plot_fracture("complete", "footPrint")
+    plt.show
     # plotting width at center
     if plot_w_cntr:
         if fig_w_cntr is None:
@@ -204,6 +228,22 @@ def plot_data(address, plot_analytical=True, regime = "M", plot_w_cntr=True, fig
             ax_r.plot(time_series, R_numrcl, 'o')
         plt.ylabel('fracture radius')
         plt.xlabel('time')
+
+    # plotting volume
+    if plot_volume:
+        fig_vol = plt.figure()
+        ax_vol = fig_vol.add_subplot(111)
+        if loglog:
+            if plot_analytical:
+                ax_vol.loglog(time_series, vol_anltcl)
+            ax_vol.loglog(time_series, vol_numrcl, 'o')
+        else:
+            if plot_analytical:
+                ax_vol.plot(time_series, vol_anltcl)
+            ax_vol.plot(time_series, vol_numrcl, 'o')
+        plt.ylabel('fracture volume')
+        plt.xlabel('time')
+        print("Injected volume = " + repr(injection.injectionRate[1,0] * time_series))
 
     # plotting pressure at center
     if plot_p_cntr:

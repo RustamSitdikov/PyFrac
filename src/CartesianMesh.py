@@ -115,10 +115,12 @@ class CartesianMesh:
         self.CenterElts = np.intersect1d(np.where(abs(self.CenterCoor[:, 0]) - minx < 1e-10),
                                          np.where(abs(self.CenterCoor[:, 1]) - miny < 1e-10))
 
-    def locate_element(self, x, y):
-        e = np.intersect1d(np.where(abs(self.CenterCoor[:, 0]) - x < 1e-10),
-                           np.where(abs(self.CenterCoor[:, 1]) - y < 1e-10))
+    def locate_element(self, points):
+        e = np.asarray([],dtype=int)
+        for i in range(0, points.shape[0]):
+            e = np.append(e, np.intersect1d(np.where(abs(self.CenterCoor[:, 0] - points[i,0]) < self.hx/2.1),
+                               np.where(abs(self.CenterCoor[:, 1] - points[i,1]) < self.hy/2.1)))
         # todo: form mesh according to the injection point
-        return e
+        return np.unique(e)
 
 #############################################

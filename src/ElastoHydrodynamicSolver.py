@@ -89,8 +89,9 @@ def FiniteDiff_operator_turbulent_implicit(w, EltCrack, mu, Mesh, InCrack, rho, 
     dy = Mesh.hy
 
     # todo: can be evaluated at each cell edge
-    rough = w[EltCrack]/(2*dgrain)
-    # rough[np.where(rough < 3)[0]] = 3.
+    # rough = w[EltCrack]/(2*dgrain)
+    rough = 10000.*np.ones((EltCrack.size,),)
+    # rough[np.where(rough < 1)[0]] = 1.
 
     # width on edges; evaluated by averaging the widths of adjacent cells
     wLftEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 0]]) / 2
@@ -262,8 +263,9 @@ def Velocity_Residual(v,*args):
     Re = 4/3 * rho * w * v / mu
 
     # friction factor using Yang-Joseph approximation
-    f = 0.143/4 * rough**(-1/3)
-    # f = 16./Re
+    f = friction_factor(Re, rough)
+    #f = 0.143/4 / rough**(1/3)
+    #f = 16./Re
 
     return v-w*dp/(v*rho*f)
 

@@ -144,7 +144,7 @@ class InjectionProperties:
             print('Invalid source coordinates. Correct format: a numpy array with a single row and two columns to \n'
                   'specify x and y coordinate of the source e.g. np.array([x_coordinate, y_coordinate])')
 
-        self.source_location = Mesh.locate_element(source_coordinates[0], source_coordinates[1])
+        self.source_location = Mesh.locate_element(source_coordinates)
 
 
 

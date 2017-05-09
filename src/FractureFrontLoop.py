@@ -130,8 +130,9 @@ def FractureFrontLoop(Frac, C, Material_properties, Fluid_properties, Simulation
     indxCurTime = max(np.where(Frac.time >= Injection_Parameters.injectionRate[0, :])[0])
     CurrentRate = Injection_Parameters.injectionRate[1, indxCurTime]  # current injection rate
 
+    # current injection over the domain
     Qin = np.zeros((Frac.mesh.NumberOfElts), float)
-    Qin[Injection_Parameters.source_location] = CurrentRate # current injection over the domain
+    Qin[Injection_Parameters.source_location] = CurrentRate/len(Injection_Parameters.source_location)
 
 
     f = open('log', 'a')
@@ -248,7 +249,7 @@ def injection_same_footprint(Fr_lstTmStp, C, timeStep, Qin, mat_properties, Flui
         Fr_lstTmStp.InCrack,
         DLkOff, mat_properties.SigmaO,
         Fluid_properties.density,
-        Fluid_properties.turbulence,
+        False,
         mat_properties.grainSize
         )
 
@@ -493,7 +494,7 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
     # typical value for pressure
     typValue = np.copy(guess)
     typValue[Fr_lstTmStp.EltChannel.size + np.arange(EltsTipNew.size)] = 1e5
-    # todo too many arguments; properties class needs to be utilized
+    # todo too many arguments; properties classes need to be utilized
     arg = (
         Fr_lstTmStp.EltChannel,
         EltsTipNew,
