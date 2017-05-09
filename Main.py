@@ -28,21 +28,21 @@ from src.Properties import *
 from src.FractureFrontLoop import *
 
 # creating mesh
-Mesh = CartesianMesh(15, 5, 75, 39)
-h = 4.5
+Mesh = CartesianMesh(60, 20, 75, 39)
+h = 18
 # solid properties
 nu = 0.4
 Eprime = 3.3e10 / (1 - nu ** 2)
 K_Ic = 0.1e6*np.ones((Mesh.NumberOfElts,),dtype=np.float64)
-highKIC = np.where(abs(Mesh.CenterCoor[:,1])>=2.08)[0]
+highKIC = np.where(abs(Mesh.CenterCoor[:,1])>=8.4)[0]
 K_Ic[highKIC] = 15e6
 
 
 sigma0 = 0 * 1e6
-Solid = MaterialProperties(Eprime, K_Ic, 0., sigma0, Mesh, grain_size=1e-7)
+Solid = MaterialProperties(Eprime, K_Ic, 0., sigma0, Mesh, grain_size=5e-4)
 
 # injection parameters
-Q0 = 0.109  # injection rate
+Q0 = 0.218*2  # injection rate
 well_location = np.zeros((int(h/Mesh.hy)+1,2),dtype=np.float64)
 well_location[:,1] = np.linspace(-np.floor(h/Mesh.hy/2)*Mesh.hy,np.floor(h/Mesh.hy/2)*Mesh.hy,int(h/Mesh.hy)+1)
 Injection = InjectionProperties(Q0, well_location, Mesh)
@@ -55,15 +55,15 @@ simulProp = SimulationParameters(max_itr_solver=100,
                                  tip_asymptote="U",
                                  max_reattemps=10,
                                  output_time_period=0.001,
-                                 plot_figure=False,
-                                 save_to_disk=True,
+                                 plot_figure=True,
+                                 save_to_disk=False,
                                  out_file_address=".\\Data\\smoothPKN",
                                  plot_analytical=True,
                                  cfl_factor=0.8)
 
 
 # initializing fracture
-initRad = 2.4 # initial radius of fracture
+initRad = 10 # initial radius of fracture
 Fr = Fracture(Mesh, Fluid, Solid) # create fracture object
 Fr.initialize_radial_Fracture(initRad,
                               'radius',

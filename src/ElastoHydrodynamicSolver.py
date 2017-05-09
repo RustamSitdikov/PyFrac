@@ -89,9 +89,9 @@ def FiniteDiff_operator_turbulent_implicit(w, EltCrack, mu, Mesh, InCrack, rho, 
     dy = Mesh.hy
 
     # todo: can be evaluated at each cell edge
-    # rough = w[EltCrack]/(2*dgrain)
-    rough = 10000.*np.ones((EltCrack.size,),)
-    # rough[np.where(rough < 1)[0]] = 1.
+    rough = w[EltCrack]/(2*dgrain)
+    # rough = 10000.*np.ones((EltCrack.size,),)
+    rough[np.where(rough < 2)[0]] = 2.
 
     # width on edges; evaluated by averaging the widths of adjacent cells
     wLftEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 0]]) / 2
