@@ -248,7 +248,7 @@ def injection_same_footprint(Fr_lstTmStp, C, timeStep, Qin, mat_properties, Flui
         Fr_lstTmStp.InCrack,
         DLkOff, mat_properties.SigmaO,
         Fluid_properties.density,
-        Fluid_properties.turbulence,
+        False, # laminar assumption for ballooning of the fracture
         mat_properties.grainSize
         )
 
@@ -553,10 +553,13 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
 
     Fr_kplus1.InCrack = InCrack_k
 
-    # # check if the tip has laminar flow, to be consistent with tip asymptote.
-    # ReNumb, check = turbulence_check_tip(vel, Fr_kplus1, Fluid_properties, return_ReyNumb=True)
-    # # plot Reynold's number
+    # check if the tip has laminar flow, to be consistent with tip asymptote.
+    ReNumb, check = turbulence_check_tip(vel, Fr_kplus1, Fluid_properties, return_ReyNumb=True)
+    # plot Reynold's number
+    ReyNo_mid, turb_limit = find_turbulent_limit(ReNumb, Fr_kplus1)
     # plot_Reynolds_number(Fr_kplus1, ReNumb, 1)
+    f = open('log', 'a')
+    f.write("\ntime = "+repr(Fr_kplus1.time)+" RN mid = "+repr(ReyNo_mid)+" turb limit = "+repr(turb_limit))
 
     # Fr_kplus1.plot_fracture("complete", "footPrint")
     # plt.show()
@@ -598,6 +601,14 @@ def output(Fr_lstTmStp, Fr_advanced, simulation_parameters, material_properties,
                                                              Q0,
                                                              Fr_lstTmStp.mesh,
                                                              Fr_advanced.time)
+
+                elif simulation_parameters.analyticalSol == "TR":
+                    (R, p, w, v) = turbulent_Rough_t_given(material_properties.Eprime,
+                                                           Q0,
+                                                           Fr_lstTmStp.mesh,
+                                                           material_properties.grainSize,
+                                                           fluid_properties.density,
+                                                           Fr_advanced.time)
 
                 fig = Fr_advanced.plot_fracture('complete',
                                                 'footPrint',

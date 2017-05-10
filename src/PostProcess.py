@@ -19,7 +19,7 @@ from src.Utility import *
 
 
 def plot_data(address, plot_analytical=True, regime = "M", plot_w_cntr=True, fig_w_cntr=None, plot_r=True, fig_r=None,
-              plot_p_cntr=False, fig_p_cntr=None, maxFiles=150, loglog=True, plot_w_prfl=False, plot_p_prfl=False):
+              plot_p_cntr=False, fig_p_cntr=None, maxFiles=150, loglog=True, plot_w_prfl=False, plot_p_prfl=False, plot_vol=False):
     """
     This function reads the saved files in the given folder and plots the figures that are enabled. Analytical solutions
     according to the given regime can also be plotted along with the numerical solution read from the saved files.
@@ -111,7 +111,9 @@ def plot_data(address, plot_analytical=True, regime = "M", plot_w_cntr=True, fig
         except FileNotFoundError:
             break
 
-        time_series = np.append(time_series, Fr.time)
+        tlk = ((2**(1/3)*0.143/4)**(15/13) * solid.Eprime**(37/13) * injection.injectionRate[1, 0]**(17/13) *
+               solid.grainSize**(5/13) * fluid.density**(15/13)/ solid.Kprime[injection.source_location]**4)
+        time_series = np.append(time_series, Fr.time/tlk)
         # radius of the fracture is evaluated by adding the distance of the zero vertex from the center (injection
         # point) to the length of the perpendicular drawn on the fracture front in the tip cell
         tipVrtxCoord = Fr.mesh.VertexCoor[Fr.mesh.Connectivity[Fr.EltTip, Fr.ZeroVertex]]
@@ -138,6 +140,9 @@ def plot_data(address, plot_analytical=True, regime = "M", plot_w_cntr=True, fig
                                                                  injection.injectionRate[1, 0],
                                                                  Fr.mesh,
                                                                  Fr.time)
+            elif regime == "TR":
+                (R_a, p_a, w_a, v_a) = turbulent_Rough_t_given(solid.Eprime, injection.injectionRate[1, 0],
+                                    Fr.mesh, solid.grainSize, fluid.density, Fr.time)
             R_anltcl = np.append(R_anltcl, R_a)
             w_anltcl_centr = np.append(w_anltcl_centr, w_a[injection.source_location])
             p_anltcl_centr = np.append(p_anltcl_centr, p_a[injection.source_location])
@@ -205,6 +210,25 @@ def plot_data(address, plot_analytical=True, regime = "M", plot_w_cntr=True, fig
         plt.ylabel('fracture radius')
         plt.xlabel('time')
 
+
+    # plotting volume
+    if plot_vol:
+        fig_vol = plt.figure()
+        ax_vol = fig_vol.add_subplot(111)
+        if loglog:
+            if plot_analytical:
+                ax_vol.loglog(time_series, vol_anltcl)
+                ax_vol.loglog(time_series, injection.injectionRate[1,0] * time_series*tlk)
+            ax_vol.loglog(time_series, vol_numrcl, 'o')
+        else:
+            if plot_analytical:
+                ax_vol.plot(time_series, vol_anltcl)
+                ax_vol.plot(time_series, injection.injectionRate[1, 0] * time_series*tlk)
+            ax_vol.plot(time_series, vol_numrcl, 'o')
+        plt.ylabel('fracture volume')
+        plt.xlabel('time')
+
+
     # plotting pressure at center
     if plot_p_cntr:
         if fig_p_cntr is None:
@@ -225,14 +249,21 @@ def plot_data(address, plot_analytical=True, regime = "M", plot_w_cntr=True, fig
     #plotting width profile at the center
     if plot_w_prfl:
         fig_w_prfl = plt.figure()
-        for i in range(1, 7):
+        for i in range(1, 6):
             ax = fig_w_prfl.add_subplot(2, 3, i)
             ax.plot(x, w_hrzntl_numrcl[((fileNo - 1) // 6) * i],'o')
             ax.plot(x, w_hrzntl_anltcl[((fileNo - 1) // 6) * i])
             plt.ylabel("width (meters)")
             plt.xlabel("x (meters)")
             plt.title("time = " + str(round(time_series[((fileNo-1)//6) * i],5)) + " sec")
+        ax = fig_w_prfl.add_subplot(2, 3, 6)
+        ax.plot(x, w_hrzntl_numrcl[fileNo - 1], 'o')
+        ax.plot(x, w_hrzntl_anltcl[fileNo - 1])
+        plt.ylabel("width (meters)")
+        plt.xlabel("x (meters)")
+        plt.title("time = " + str(round(time_series[fileNo - 1], 5)) + " sec")
         plt.suptitle('Width profile at cross section passing through the injection point (center)')
+        print(repr(w_hrzntl_anltcl[fileNo-1]/w_hrzntl_numrcl[fileNo-1]))
     else:
         fig_w_prfl = None
 
@@ -246,6 +277,12 @@ def plot_data(address, plot_analytical=True, regime = "M", plot_w_cntr=True, fig
             plt.ylabel("pressure (pascals)")
             plt.xlabel("x (meters)")
             plt.title("time = " + str(round(time_series[((fileNo - 1) // 6) * i],5)) + " sec")
+        ax = fig_w_prfl.add_subplot(2, 3, 6)
+        ax.plot(x, p_hrzntl_numrcl[fileNo - 1], 'o')
+        ax.plot(x, p_hrzntl_anltcl[fileNo - 1])
+        plt.ylabel("pressure (pascals)")
+        plt.xlabel("x (meters)")
+        plt.title("time = " + str(round(time_series[fileNo - 1], 5)) + " sec")
         plt.suptitle('Pressure profile at cross section passing through the injection point (center)')
     else:
         fig_p_prfl = None

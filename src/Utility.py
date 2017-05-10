@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 import pickle
-
+from scipy import interpolate
+from scipy.optimize import brentq
 from src.VolIntegral import Pdistance
 
 
@@ -113,9 +114,9 @@ def PlotMeshFractureTrace(Mesh, EltTip, EltChannel, EltRibbon, I, J, Ranalytical
 
     patches = []
     for i in range(Mesh.NumberOfElts):
-        polygon = Polygon(np.reshape(Mesh.VertexCoor[Mesh.Connectivity[i], :], (4, 2)), True)
+        polygon = Polygon(np.reshape(Mesh.VertexCoor[Mesh.Connectivity[i], :], (4, 2)), True, edgecolor="k")
         patches.append(polygon)
-    p = PatchCollection(patches, cmap=matplotlib.cm.jet, alpha=0.5)
+        p = PatchCollection(patches, cmap=matplotlib.cm.jet, alpha=0.5, edgecolors="k")
 
     # todo: A proper mechanism to mark element with different material properties has to be looked into
     # marking those elements that have sigmaO or toughness different than the sigmaO or toughness at the center
@@ -181,6 +182,23 @@ def plot_Reynolds_number(Fr, ReyNum, edge):
     return figr
 
 #-----------------------------------------------------------------------------------------------------------------------
+
+def find_turbulent_limit(ReyNum, Fr):
+
+    tipVrtxCoord = Fr.mesh.VertexCoor[Fr.mesh.Connectivity[Fr.EltTip, Fr.ZeroVertex]]
+    R =  max((tipVrtxCoord[:, 0] ** 2 + tipVrtxCoord[:, 1] ** 2) ** 0.5 + Fr.l)
+
+    horzntl = np.where(abs(Fr.mesh.CenterCoor[:, 1] - 0.0) < 1e-5)[0]
+    ReyNum_func = interpolate.interp1d(Fr.mesh.CenterCoor[horzntl, 0]-Fr.mesh.hx/2, ReyNum[0,horzntl])
+    ReyNo_mid = ReyNum_func(R/2.)
+
+    # plt.plot(Fr.mesh.CenterCoor[horzntl, 0]-Fr.mesh.hx/2, ReyNum_func(Fr.mesh.CenterCoor[horzntl, 0]-Fr.mesh.hx/2))
+    # plt.show()
+    turb_limit_Res = lambda x: ReyNum_func(x)-2100
+    turb_limit = brentq(turb_limit_Res, Fr.mesh.hx/2.,R)/R
+    return ReyNo_mid, turb_limit
+
+
 def ReadFracture(filename):
     with open(filename, 'rb') as input:
         return pickle.load(input)

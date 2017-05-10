@@ -90,7 +90,7 @@ def FiniteDiff_operator_turbulent_implicit(w, EltCrack, mu, Mesh, InCrack, rho, 
 
     # todo: can be evaluated at each cell edge
     rough = w[EltCrack]/(2*dgrain)
-    # rough[np.where(rough < 3)[0]] = 3.
+    rough[np.where(rough < 2)[0]] = 2.
 
     # width on edges; evaluated by averaging the widths of adjacent cells
     wLftEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 0]]) / 2
@@ -262,8 +262,9 @@ def Velocity_Residual(v,*args):
     Re = 4/3 * rho * w * v / mu
 
     # friction factor using Yang-Joseph approximation
-    f = 0.143/4 * rough**(-1/3)
+    #f = 0.143/4 * rough**(-1/3)
     # f = 16./Re
+    f = friction_factor(Re, rough)
 
     return v-w*dp/(v*rho*f)
 
@@ -463,9 +464,9 @@ def Picard_Newton(Res_fun, sys_fun, guess, TypValue, interItr, Tol, maxitr, *arg
 
         normlist[k] = norm
 
-        # todo !!! Hack: Consider coverged if norm grows and last norm is greater than 1e-4
-        if norm > normlist[k - 1] and normlist[k - 1] < 1e-4:
-            break
+        # # todo !!! Hack: Consider coverged if norm grows and last norm is greater than 1e-4
+        # if norm > normlist[k - 1] and normlist[k - 1] < 1e-4:
+        #     break
         k = k + 1
 
         if k == maxitr:  # returns nan as solution if does not converge

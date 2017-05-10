@@ -337,3 +337,113 @@ def PKN_solution(Eprime, Q0, muPrime, Mesh, t, h):
     v = 0.01 * sol_l / (t1 - t)
 
     return (sol_l, p, w, v, PKN)
+
+#-----------------------------------------------------------------------------------------------------------------------
+
+def turbulent_Rough_t_given(Eprime, Q0, Mesh, k, density, t):
+    """
+    Analytical solution for Viscosity dominated (M vertex) fracture propagation, given fracture radius. The solution
+    does not take leak off into account.
+
+    Arguments:
+        Eprime (float):         plain strain elastic modulus
+        Q0 (float):             injection rate
+        muPrime (float):        12*viscosity
+        Mesh (CartesianMesh):   a CartesianMesh class object describing the grid.
+        R (float):              the given radius for which the solution is evaluated
+
+    Returns:
+        float:                  time at which the fracture reached the given radius
+        ndarray-float:          pressure at each cell when the fracture has propagated to the given radius
+        ndarray-float:          width at each cell when the fracture has propagated to the given radius
+        float:                  fracture propagation velocity
+    """
+    fr = 2**(1/3) * 0.143/4
+    R = 0.8572621767348121*((Eprime*Q0**2.3333333333333335*t**4.333333333333333)/(
+        fr*k**0.3333333333333333*density))**0.11538461538461539
+
+    w = np.zeros((Mesh.NumberOfElts,))
+    p = np.zeros((Mesh.NumberOfElts,))
+    rho = (Mesh.CenterCoor[:, 0] ** 2 + Mesh.CenterCoor[:, 1] ** 2) ** 0.5 / R  # normalized distance from center
+    actv = np.where(rho <= 1)[0]  # active cells (inside fracture)
+
+    # # temporary variables to avoid recomputation
+    # var1 = -2 + 2 * rho[actv]
+    # var2 = 1 - rho[actv]
+
+    # todo: cite where the solution is taken from
+    w[actv] = (0.8572621767348121*Q0**0.46153846153846156*(fr*k**0.3333333333333333*density)**0.23076923076923078*
+         (1.2228604265714231*(1 - rho[actv])**0.8571428571428571 + 0.00776652629896559*(1 - rho[actv])**0.8571428571428571*
+            (5.040816326530612 + (520*(-2 + 2*rho[actv]))/49. + (235*(-2 + 2*rho[actv])**2)/49.) +
+           0.003379475452639849*(1 - rho[actv])**0.8571428571428571*(7.921282798833819 + (20163*(-2 + 2*rho[actv]))/686. + (41877*(-2 + 2*rho[actv])**2)/1372. + (25803*(-2 + 2*rho[actv])**3)/2744.) +
+           0.0005162336622018735*(1 - rho[actv])**0.8571428571428571*(11.316118284048313 + (154440*(-2 + 2*rho[actv]))/2401. + (271755*(-2 + 2*rho[actv])**2)/2401. +
+              (186660*(-2 + 2*rho[actv])**3)/2401. + (699975*(-2 + 2*rho[actv])**4)/38416.) +
+           0.002195766622619536*(1 - rho[actv])**0.8571428571428571*(15.195930267150592 + (2049905*(-2 + 2*rho[actv]))/16807. + (5361290*(-2 + 2*rho[actv])**2)/16807. +
+              (6092375*(-2 + 2*rho[actv])**3)/16807. + (49957475*(-2 + 2*rho[actv])**4)/268912. + (18920065*(-2 + 2*rho[actv])**5)/537824.) +
+           0.051785879401382434*(1 - rho[actv])**0.8571428571428571*(0.7142857142857143 + (33*(-1 + 2*rho[actv]))/7.) -
+           0.077780547602584869561*((1 - rho[actv]**2)**0.5 + np.log(rho[actv]) - np.log(1 + (1 - rho[actv]**2)**0.5))))/Eprime**0.23076923076923078
+
+    # w[Mesh.CenterElts] = sum(sum(w[Mesh.NeiElements[Mesh.CenterElts]]))/4 * 1.3
+    # todo pressure
+    p[actv] = 0.0
+    # todo !!! Hack: The velocity is evaluated with time taken by the fracture to advance by one percent (not sure)
+    t1 = 0.360732240039184*((fr*k**0.3333333333333333*(1.01*R)**8.666666666666666*density)/(
+        Eprime*Q0**2.3333333333333335))**0.23076923076923078
+    v = 0.01 * R / (t1 - t)
+
+    return (R, p, w, v)
+
+#-----------------------------------------------------------------------------------------------------------------------
+
+def turbulent_Rough_R_given(Eprime, Q0, Mesh, k, density, R):
+    """
+    Analytical solution for Viscosity dominated (M vertex) fracture propagation, given fracture radius. The solution
+    does not take leak off into account.
+
+    Arguments:
+        Eprime (float):         plain strain elastic modulus
+        Q0 (float):             injection rate
+        muPrime (float):        12*viscosity
+        Mesh (CartesianMesh):   a CartesianMesh class object describing the grid.
+        R (float):              the given radius for which the solution is evaluated
+
+    Returns:
+        float:                  time at which the fracture reached the given radius
+        ndarray-float:          pressure at each cell when the fracture has propagated to the given radius
+        ndarray-float:          width at each cell when the fracture has propagated to the given radius
+        float:                  fracture propagation velocity
+    """
+    fr = 2**(1/3) * 0.143/4
+    t = 0.360732240039184*((fr*k**0.3333333333333333*R**8.666666666666666*density)/(
+        Eprime*Q0**2.3333333333333335))**0.23076923076923078
+
+    w = np.zeros((Mesh.NumberOfElts,))
+    p = np.zeros((Mesh.NumberOfElts,))
+    rho = (Mesh.CenterCoor[:, 0] ** 2 + Mesh.CenterCoor[:, 1] ** 2) ** 0.5 / R  # normalized distance from center
+    actv = np.where(rho <= 1)[0]  # active cells (inside fracture)
+
+    # temporary variables to avoid recomputation
+    # var1 = -2 + 2 * rho[actv]
+    # var2 = 1 - rho[actv]
+
+    # todo: cite where the solution is taken from
+    w[actv] = (0.8572621767348121*Q0**0.46153846153846156*(fr*k**0.3333333333333333*density)**0.23076923076923078*
+         (1.2228604265714231*(1 - rho[actv])**0.8571428571428571 + 0.00776652629896559*(1 - rho[actv])**0.8571428571428571*
+            (5.040816326530612 + (520*(-2 + 2*rho[actv]))/49. + (235*(-2 + 2*rho[actv])**2)/49.) +
+           0.003379475452639849*(1 - rho[actv])**0.8571428571428571*(7.921282798833819 + (20163*(-2 + 2*rho[actv]))/686. + (41877*(-2 + 2*rho[actv])**2)/1372. + (25803*(-2 + 2*rho[actv])**3)/2744.) +
+           0.0005162336622018735*(1 - rho[actv])**0.8571428571428571*(11.316118284048313 + (154440*(-2 + 2*rho[actv]))/2401. + (271755*(-2 + 2*rho[actv])**2)/2401. +
+              (186660*(-2 + 2*rho[actv])**3)/2401. + (699975*(-2 + 2*rho[actv])**4)/38416.) +
+           0.002195766622619536*(1 - rho[actv])**0.8571428571428571*(15.195930267150592 + (2049905*(-2 + 2*rho[actv]))/16807. + (5361290*(-2 + 2*rho[actv])**2)/16807. +
+              (6092375*(-2 + 2*rho[actv])**3)/16807. + (49957475*(-2 + 2*rho[actv])**4)/268912. + (18920065*(-2 + 2*rho[actv])**5)/537824.) +
+           0.051785879401382434*(1 - rho[actv])**0.8571428571428571*(0.7142857142857143 + (33*(-1 + 2*rho[actv]))/7.) -
+           0.077780547602584869561*((1 - rho[actv]**2)**0.5 + np.log(rho[actv]) - np.log(1 + (1 - rho[actv]**2)**0.5))))/Eprime**0.23076923076923078
+
+    # w[Mesh.CenterElts] = sum(w[Mesh.NeiElements[Mesh.CenterElts]]) / 4 * 1.5
+    # todo pressure
+    p[actv] = 0.0
+    # todo !!! Hack: The velocity is evaluated with time taken by the fracture to advance by one percent (not sure)
+    t1 = 0.360732240039184*((fr*k**0.3333333333333333*(1.01*R)**8.666666666666666*density)/(
+        Eprime*Q0**2.3333333333333335))**0.23076923076923078
+    v = 0.01 * R / (t1 - t)
+
+    return (t, p, w, v)

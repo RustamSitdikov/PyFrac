@@ -28,14 +28,14 @@ from src.Properties import *
 from src.FractureFrontLoop import *
 
 # creating mesh
-Mesh = CartesianMesh(3, 3, 41, 41)
+Mesh = CartesianMesh(6, 6, 41, 41)
 
 # solid properties
 nu = 0.4
 Eprime = 3.3e10 / (1 - nu ** 2)
 K_Ic = 0.005e6
 sigma0 = 0 * 1e6
-Solid = MaterialProperties(Eprime, K_Ic, 0., sigma0, Mesh, grain_size=1e-6)
+Solid = MaterialProperties(Eprime, K_Ic, 0., sigma0, Mesh, grain_size=1e-5)
 
 # injection parameters
 Q0 = 0.09  # injection rate
@@ -46,17 +46,18 @@ Injection = InjectionProperties(Q0, well_location, Mesh)
 Fluid = FluidProperties(1.1e-3, Mesh, turbulence=True)
 
 # simulation properties
-simulProp = SimulationParameters(tip_asymptote="T",
+simulProp = SimulationParameters(tip_asymptote="U",
                                  output_time_period=0.005,
                                  plot_figure=False,
                                  save_to_disk=True,
-                                 out_file_address=".\\Data\\TurbRough",
+                                 out_file_address=".\\Data\\TurbRoughInit2",
                                  plot_analytical=True,
-                                 cfl_factor=0.9)
+                                 cfl_factor=0.9,
+                                 analytical_sol="TR")
 
 
 # initializing fracture
-initRad = 0.8 # initial radius of fracture
+initRad = 3 # initial radius of fracture
 Fr = Fracture(Mesh, Fluid, Solid) # create fracture object
 Fr.initialize_radial_Fracture(initRad,
                               'radius',
@@ -66,6 +67,8 @@ Fr.initialize_radial_Fracture(initRad,
                               Injection,
                               simulProp) # initializing
 
+Fr.plot_fracture("complete", "width")
+plt.show()
 
 # elasticity matrix
 C = load_elasticity_matrix(Mesh, Solid.Eprime)
@@ -82,11 +85,12 @@ while (Fr.time < Tend) and (i < MaximumTimeSteps):
 
     print('\n*********************\ntime = ' + repr(Fr.time))
 
-    TimeStep = simulProp.CFLfactor * Fr.mesh.hx / np.mean(Fr.v)
+    TimeStep = simulProp.CFLfactor * min(Fr.mesh.hx, Fr.mesh.hy) / np.max(Fr.v)
     status, Fr_k = attempt_time_step(Fr_k, C, Solid, Fluid, simulProp, Injection, TimeStep)
 
     # Fr.plot_fracture("complete", "width")
     # plt.show()
     Fr = copy.deepcopy(Fr_k)
-
+    print("volume in numerical " + repr(sum(Fr.w) * Fr.mesh.EltArea) + " volume injected " + repr(
+        Injection.injectionRate[1, 0] * Fr.time))
 

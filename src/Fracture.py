@@ -143,6 +143,9 @@ class Fracture():
             elif regime == 'Mt':
                 (self.initRad, self.p, self.w, v) = MT_vertex_solution_t_given(solid.Eprime, np.mean(solid.Cprime),
                                                     injection.injectionRate[1,0], fluid.muPrime, self.mesh, initValue)
+            elif regime == 'TR':
+                (self.initRad, self.p, self.w, v) = turbulent_Rough_t_given(solid.Eprime, injection.injectionRate[1,0],
+                                                                self.mesh, solid.grainSize, fluid.density, initValue)
             else:
                 print('regime ' + regime + ' not supported')
                 return
@@ -158,6 +161,10 @@ class Fracture():
                 (self.time, self.p, self.w, v) = Mt_vertex_solution_r_given(solid.Eprime, np.mean(solid.Cprime),
                                                                     injection.injectionRate[1,0],
                                                                     fluid.muPrime, self.mesh, initValue)
+            elif regime == 'TR':
+                (self.time, self.p, self.w, v) = turbulent_Rough_R_given(solid.Eprime, injection.injectionRate[1, 0],
+                                                                            self.mesh, solid.grainSize, fluid.density,
+                                                                            initValue)
             else:
                 print('regime ' + regime + ' not supported')
                 return
