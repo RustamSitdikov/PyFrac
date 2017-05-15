@@ -46,13 +46,13 @@ Injection = InjectionProperties(Q0, well_location, Mesh)
 Fluid = FluidProperties(1.1e-3, Mesh, turbulence=True)
 
 # simulation properties
-simulProp = SimulationParameters(tip_asymptote="U",
-                                 output_time_period=0.005,
-                                 plot_figure=False,
-                                 save_to_disk=True,
+simulProp = SimulationParameters(tip_asymptote="T",
+                                 output_time_period=0.05,
+                                 plot_figure=True,
+                                 save_to_disk=False,
                                  out_file_address=".\\Data\\TurbRoughInit2",
                                  plot_analytical=True,
-                                 cfl_factor=0.9,
+                                 cfl_factor=0.4,
                                  analytical_sol="TR")
 
 
@@ -61,13 +61,13 @@ initRad = 3 # initial radius of fracture
 Fr = Fracture(Mesh, Fluid, Solid) # create fracture object
 Fr.initialize_radial_Fracture(initRad,
                               'radius',
-                              'M',
+                              'TR',
                               Solid,
                               Fluid,
                               Injection,
                               simulProp) # initializing
 
-Fr.plot_fracture("complete", "width")
+Fr.plot_fracture("complete", "footPrint", identify=np.asarray([839,840,768]))
 plt.show()
 
 # elasticity matrix

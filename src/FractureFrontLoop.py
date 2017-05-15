@@ -522,6 +522,7 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
                                sim_parameters.maxSolverItr,
                                *arg)
 
+    err = (sum(sol[np.arange(Fr_lstTmStp.EltChannel.size)])*Fr_lstTmStp.mesh.EltArea-sum(Qin)*timeStep)/sum(Qin)*timeStep
     # the fracture to be returned for k plus 1 iteration
     Fr_kplus1 = copy.deepcopy(Fr_lstTmStp)
 

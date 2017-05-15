@@ -93,10 +93,10 @@ def FiniteDiff_operator_turbulent_implicit(w, EltCrack, mu, Mesh, InCrack, rho, 
     rough[np.where(rough < 2)[0]] = 2.
 
     # width on edges; evaluated by averaging the widths of adjacent cells
-    wLftEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 0]]) / 2
-    wRgtEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 1]]) / 2
-    wBtmEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 2]]) / 2
-    wTopEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 3]]) / 2
+    wLftEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 0]]) / 2 * InCrack[Mesh.NeiElements[EltCrack, 0]]
+    wRgtEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 1]]) / 2 * InCrack[Mesh.NeiElements[EltCrack, 1]]
+    wBtmEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 2]]) / 2 * InCrack[Mesh.NeiElements[EltCrack, 2]]
+    wTopEdge = (w[EltCrack] + w[Mesh.NeiElements[EltCrack, 3]]) / 2 * InCrack[Mesh.NeiElements[EltCrack, 3]]
 
     # pressure gradient data structure. The rows store pressure gradient in the following order.
     # 0 - pressure gradient on the left edge in x-direction
@@ -206,7 +206,7 @@ def FiniteDiff_operator_turbulent_implicit(w, EltCrack, mu, Mesh, InCrack, rho, 
 
 
 
-    # calculating friction factor with the Yang-Joseph explicit function
+    # calculating friction factor with the friction factor function
     ffLftEdge = np.zeros((EltCrack.size), dtype=np.float64)
     ffRgtEdge = np.zeros((EltCrack.size), dtype=np.float64)
     ffBtmEdge = np.zeros((EltCrack.size), dtype=np.float64)

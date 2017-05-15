@@ -114,9 +114,10 @@ def PlotMeshFractureTrace(Mesh, EltTip, EltChannel, EltRibbon, I, J, Ranalytical
 
     patches = []
     for i in range(Mesh.NumberOfElts):
-        polygon = Polygon(np.reshape(Mesh.VertexCoor[Mesh.Connectivity[i], :], (4, 2)), True, edgecolor="k")
+        polygon = Polygon(np.reshape(Mesh.VertexCoor[Mesh.Connectivity[i], :], (4, 2)), True)
         patches.append(polygon)
-        p = PatchCollection(patches, cmap=matplotlib.cm.jet, alpha=0.5, edgecolors="k")
+    p = PatchCollection(patches, cmap=matplotlib.cm.jet, alpha=0.5, edgecolors="k")
+
 
     # todo: A proper mechanism to mark element with different material properties has to be looked into
     # marking those elements that have sigmaO or toughness different than the sigmaO or toughness at the center
