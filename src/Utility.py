@@ -78,7 +78,7 @@ def Neighbors(elem, nx, ny):
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def PrintDomain(Elem, Matrix, mesh):
+def PrintDomain(Matrix, mesh, Elem = None):
     """
     3D plot of all elements given in the form of a list;
     Arguments:
@@ -86,6 +86,11 @@ def PrintDomain(Elem, Matrix, mesh):
         Matrix(ndarray-float):      values to be plotted, should be equal in size to the first argument(Elem)
         mesh(CartesianMesh object): mesh object
     """
+    if Elem == None:
+        Elem = np.arange(mesh.NumberOfElts)
+
+    # if len(Matrix.shape)==1:
+    #     Matrix = np.reshape(Matrix, (mesh.ny, mesh.nx))
 
     tmp = np.zeros((mesh.NumberOfElts,))
     tmp[Elem] = Matrix
@@ -180,6 +185,19 @@ def plot_Reynolds_number(Fr, ReyNum, edge):
 
     return figr
 
+def plot_as_matrix(data, mesh):
+    figr = plt.figure()
+    ax = figr.add_subplot(111)
+    ReMesh = np.resize(data, (mesh.ny, mesh.nx))
+    x = np.linspace(-mesh.Lx, mesh.Lx, mesh.nx)
+    y = np.linspace(mesh.Ly, mesh.Ly, mesh.ny)
+    xv, yv = np.meshgrid(x, y)
+    # cax = ax.contourf(xv, yv, ReMesh, levels=[0, 100, 2100, 10000])
+    cax = ax.matshow(ReMesh)
+    figr.colorbar(cax)
+    plt.show()
+
+    return figr
 #-----------------------------------------------------------------------------------------------------------------------
 def ReadFracture(filename):
     with open(filename, 'rb') as input:

@@ -33,7 +33,7 @@ Mesh = CartesianMesh(3, 3, 41, 41)
 # solid properties
 nu = 0.4
 Eprime = 3.3e10 / (1 - nu ** 2)
-K_Ic = 0.005e6
+K_Ic = 1e6
 sigma0 = 0 * 1e6
 Solid = MaterialProperties(Eprime, K_Ic, 0., sigma0, Mesh)
 
@@ -47,12 +47,12 @@ Fluid = FluidProperties(1.1e-3, Mesh, turbulence=False)
 
 # simulation properties
 simulProp = SimulationParameters(tip_asymptote="U",
-                                 output_time_period=0.005,
-                                 plot_figure=True,
+                                 output_time_period=0.0005,
+                                 plot_figure=False,
                                  save_to_disk=False,
                                  out_file_address=".\\Data\\TurbLamTough",
                                  plot_analytical=True,
-                                 cfl_factor=0.4)
+                                 tmStp_prefactor=0.4)
 
 
 # initializing fracture
@@ -80,7 +80,7 @@ while (Fr.time < simulProp.FinalTime) and (i < simulProp.maxTimeSteps):
 
     print('\n*********************\ntime = ' + repr(Fr.time))
 
-    TimeStep = simulProp.CFLfactor * Fr.mesh.hx / np.mean(Fr.v)
+    TimeStep = simulProp.tmStpPrefactor * Fr.mesh.hx / np.mean(Fr.v)
     status, Fr_k = attempt_time_step(Fr_k, C, Solid, Fluid, simulProp, Injection, TimeStep)
 
     Fr = copy.deepcopy(Fr_k)

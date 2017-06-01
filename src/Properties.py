@@ -8,6 +8,7 @@
 
 import math
 import numpy as np
+from scipy import interpolate
 
 from src.CartesianMesh import *
 
@@ -45,6 +46,11 @@ class MaterialProperties:
         else:
             self.K1c = Toughness * np.ones((Mesh.NumberOfElts,), float)
             self.Kprime = (32 / math.pi) ** 0.5 * Toughness * np.ones((Mesh.NumberOfElts,), float)
+            hrzntl = np.where(abs(Mesh.CenterCoor[:, 1]) < 1e-12)[0]
+            vrtcl  = np.where(abs(Mesh.CenterCoor[:, 0]) < 1e-12)[0]
+            self.KprimeFunc = interpolate.RectBivariateSpline(Mesh.CenterCoor[vrtcl,1],
+                                                              Mesh.CenterCoor[hrzntl,0],
+                                                              np.reshape(self.Kprime,(Mesh.ny,Mesh.nx)))
 
         if isinstance(Cl, np.ndarray):  # check if float or ndarray
             if Cl.size == Mesh.NumberOfElts:  # check if size equal to the mesh size
@@ -157,7 +163,7 @@ class SimulationParameters:
             tolFractFront (float, default 1.e-3):   tolerance for the fracture front loop.
             toleranceEHL (float, default 1.e-5):    tolerance for the Elastohydrodynamic solver.
             maximumItrEHL (int, default 100):       maximum number of iterations for the Elastohydrodynamic solver.
-            CFLfactor (float, default 0.8):         factor for time-step adaptivity. 
+            tmStpPrefactor (float, default 0.8):    factor for time-step adaptivity. 
             FinalTime (float, default 1000):        time where the simulation ends.
             maxFrontItr (int, default 30):          maximum iterations to for the fracture front loop.
             tipAsymptote (string, default "U"):     propagation regime. Possible options:
@@ -187,14 +193,14 @@ class SimulationParameters:
     """
 
     def __init__(self, toleranceFractureFront=1.0e-3, toleranceEHL=1.0e-5, maxfront_its=30, max_itr_solver=100,
-                 cfl_factor=0.4, tip_asymptote='U', final_time=1000., maximum_steps=1000, max_reattemps = 5,
+                 tmStp_prefactor=0.4, tip_asymptote='U', final_time=1000., maximum_steps=1000, max_reattemps = 5,
                  reattempt_factor = 0.8, output_time_period = np.inf, plot_figure = False, save_to_disk = False,
                  out_file_address = "None", plot_analytical = False, analytical_sol = "M"):
 
         self.maxTimeSteps = maximum_steps
         self.tolFractFront = toleranceFractureFront
         self.toleranceEHL = toleranceEHL
-        self.CFLfactor = cfl_factor
+        self.tmStpPrefactor = tmStp_prefactor
         self.FinalTime = final_time
 
         # todo: all the option structures can be put into one file

@@ -90,20 +90,30 @@ def TipAsym_MKTransition_Res(dist, *args):
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def FindBracket_dist(w, EltRibbon, Kprime, Eprime, muPrime, Cprime, DistLstTS, dt, ResFunc):
-    """ Find the valid bracket for the root evaluation function. Also returns list of ribbon cells that are not propagating"""
+def FindBracket_dist(w, frac, mat_prop, fluid_prop, Kprime, dt, ResFunc):
+    """
+     Find the valid bracket for the root evaluation function. Also returns list of ribbon cells that are not
+     propagating
+     """
 
     stagnant = np.where(
-        Kprime[EltRibbon] * (-DistLstTS[EltRibbon]) ** 0.5 / (Eprime * w[EltRibbon]) > 1)  # propagation condition
-    moving = np.arange(EltRibbon.shape[0])[~np.in1d(EltRibbon, EltRibbon[stagnant])]
+        # propagation condition
+        Kprime * (-frac.sgndDist[frac.EltRibbon]) ** 0.5 / (mat_prop.Eprime * w[frac.EltRibbon]) > 1)
+    moving = np.arange(frac.EltRibbon.shape[0])[~np.in1d(frac.EltRibbon, frac.EltRibbon[stagnant])]
 
-    a = -DistLstTS[EltRibbon[moving]] * (1 + 1e5 * np.finfo(float).eps)
-    b = 10 * (w[EltRibbon[moving]] / (Kprime[EltRibbon[moving]] / Eprime)) ** 2
+    a = -frac.sgndDist[frac.EltRibbon[moving]] * (1 + 1e5 * np.finfo(float).eps)
+    b = 10 * (w[frac.EltRibbon[moving]] / (Kprime[moving] / mat_prop.Eprime)) ** 2
 
     for i in range(0, len(moving)):
 
-        TipAsmptargs = (w[EltRibbon[moving[i]]], Kprime[EltRibbon[moving[i]]], Eprime, muPrime[EltRibbon[moving[i]]],
-                        Cprime[EltRibbon[moving[i]]], -DistLstTS[EltRibbon[moving[i]]], dt)
+        TipAsmptargs = (w[frac.EltRibbon[moving[i]]],
+                        Kprime[moving[i]],
+                        mat_prop.Eprime,
+                        fluid_prop.muPrime,
+                        mat_prop.Cprime[frac.EltRibbon[moving[i]]],
+                        -frac.sgndDist[frac.EltRibbon[moving[i]]],
+                        dt)
+
         Res_a = ResFunc(a[i], *TipAsmptargs)
         Res_b = ResFunc(b[i], *TipAsmptargs)
 
@@ -117,12 +127,12 @@ def FindBracket_dist(w, EltRibbon, Kprime, Eprime, muPrime, Cprime, DistLstTS, d
             if cnt >= 30:  # Should assume not propagating. not set to check how frequently it happens.
                 raise SystemExit('Tip Inversion: front distance bracket cannot be found')
 
-    return (moving, a, b)
+    return moving, a, b
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def TipAsymInversion(w, frac, matProp, simParmtrs, dt=None):
+def TipAsymInversion(w, frac, matProp, fluidProp, simParmtrs, dt=None):
     """ 
     Evaluate distance from the front using tip assymptotics of the given regime, given the fracture width in the ribbon
     cells.
@@ -151,11 +161,12 @@ def TipAsymInversion(w, frac, matProp, simParmtrs, dt=None):
     elif simParmtrs.tipAsymptote == 'K':
         return w[frac.EltRibbon] ** 2 * (matProp.Eprime / matProp.Kprime[[frac.EltRibbon]]) ** 2
 
-    (moving, a, b) = FindBracket_dist(w, frac.EltRibbon, matProp.Kprime, matProp.Eprime, frac.muPrime, matProp.Cprime,
-                                      frac.sgndDist, dt, ResFunc)
+    Kprime = toughness(frac.EltRibbon, frac.l, frac.alpha, frac.ZeroVertex, matProp.KprimeFunc, frac.mesh)
+
+    (moving, a, b) = FindBracket_dist(w, frac, matProp, fluidProp, Kprime, dt, ResFunc)
     dist = -frac.sgndDist[frac.EltRibbon]
     for i in range(0, len(moving)):
-        TipAsmptargs = (w[frac.EltRibbon[moving[i]]], matProp.Kprime[frac.EltRibbon[moving[i]]], matProp.Eprime,
+        TipAsmptargs = (w[frac.EltRibbon[moving[i]]], Kprime[moving[i]], matProp.Eprime,
                         frac.muPrime[frac.EltRibbon[moving[i]]], matProp.Cprime[frac.EltRibbon[moving[i]]],
                         -frac.sgndDist[frac.EltRibbon[moving[i]]], dt)
         try:
@@ -195,3 +206,39 @@ def StressIntensityFactor(w, lvlSetData, EltTip, EltRibbon, stagnant, mesh, Epri
                 KIPrime[i] = w[closest] * Eprime / (-lvlSetData[closest]) ** 0.5
 
     return KIPrime
+
+def toughness(Elts, l, alpha, zero_vrtx, Kprime, mesh):
+    """
+    This function gives the toughness at the closest tip for the given cells.
+    
+    Arguments:
+        Elts (ndarray-int):             the elements for which the toughness is to be evaluated
+        l (ndarray-float):              the length of the perpendicular drawn from the zero vertex on the fracture front 
+        alpha (ndarray-float):          the angle inscribed by the perpendicular 
+        zero_vrtx (ndarray-int):        the vertex from which the perpendicular is drawn
+        Kprime (callable function):     the callable function returning the toughness given the coordinates
+        mesh (CartesianMesh object):    the mesh object
+    
+    Return:
+        ndarray-float:                  toughness at the front for the given elements
+    """
+
+    coor = np.zeros((len(Elts),2),)
+
+    # obtaining the coordinates of front from the perpendicular drawn on the fracture front from the vertex of the given
+    # elements
+    for i in range(0,len(Elts)):
+        if zero_vrtx[Elts[i]] == 0:
+            coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 0], 0] + l[Elts[i]] * np.cos(alpha[Elts[i]])
+            coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 0], 1] + l[Elts[i]] * np.sin(alpha[Elts[i]])
+        elif zero_vrtx[Elts[i]] == 1:
+            coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 1], 0] - l[Elts[i]] * np.cos(alpha[Elts[i]])
+            coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 1], 1] + l[Elts[i]] * np.sin(alpha[Elts[i]])
+        elif zero_vrtx[Elts[i]] == 2:
+            coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 2], 0] - l[Elts[i]] * np.cos(alpha[Elts[i]])
+            coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 2], 1] - l[Elts[i]] * np.sin(alpha[Elts[i]])
+        elif zero_vrtx[Elts[i]] == 3:
+            coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 3], 0] + l[Elts[i]] * np.cos(alpha[Elts[i]])
+            coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 3], 1] - l[Elts[i]] * np.sin(alpha[Elts[i]])
+
+    return Kprime.ev(coor[:,0],coor[:,1])

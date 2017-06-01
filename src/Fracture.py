@@ -42,7 +42,7 @@ class Fracture():
             EltRibbon (ndarray-int):    list of cells currently in the Ribbon region
             EltTip (ndarray-int):       list of cells currently in the Tip region
             v (ndarray-float):          propagation velocity for each cell in the tip cells
-            alpha (ndarray-float):      angle prescribed by perpendicular on the fracture front
+            alpha (ndarray-float):      angle inscribed by perpendicular on the fracture front
                                         (see Pierce 2015, Computation Methods Appl. Mech)
             l (ndarray-float):          length of perpendicular on the fracture front
                                         (see Pierce 2015, Computation Methods Appl. Mech)
@@ -316,7 +316,10 @@ class Fracture():
         self.sgndDist = radius_level_set(self.mesh.CenterCoor, self.initRad)
 
         # todo !!! Hack: tip elements are evaluated again with the front reconstructing function to avoid discrepancy
-        (self.EltTip, self.l, self.alpha, CSt) = reconstruct_front(self.sgndDist, EltChannel, self.mesh)
+        (self.EltTip, self.l, self.alpha, CSt, self.ZeroVertex) = reconstruct_front(self.sgndDist,
+                                                                                    EltChannel,
+                                                                                    EltRibbon,
+                                                                                    self.mesh)
         # filling fraction list adjusted according to the tip cells given by the front reconstructing function
         self.FillF = FillF[np.arange(EltTip.shape[0])[np.in1d(EltTip, self.EltTip)]]
 
@@ -328,20 +331,8 @@ class Fracture():
         self.Ffront = np.concatenate((I, J), axis=1)
         self.CellStatus = CellStatus
         self.InCrack = InCrack
-        self.v = v * np.ones((len(self.l)), float) # uniform velocity for all the tip elements
+        self.v = v * np.ones((len(self.l[self.EltTip])), float) # uniform velocity for all the tip elements
 
-        # assigning ZeroVertex 0, 1, 2, or 3 according to the sign of the cell center coordinates. For example, cells
-        # with both the x and y axis positive will get 0(signifying the bottom left vertex) as the zero vertex.
-        self.ZeroVertex = np.zeros((len(self.EltTip),), int)
-        for i in range(0, len(self.EltTip)):
-            if self.mesh.CenterCoor[self.EltTip[i], 0] <= 0 and self.mesh.CenterCoor[self.EltTip[i], 1] <= 0:
-                self.ZeroVertex[i] = 2
-            elif self.mesh.CenterCoor[self.EltTip[i], 0] >= 0 and self.mesh.CenterCoor[self.EltTip[i], 1] <= 0:
-                self.ZeroVertex[i] = 3
-            elif self.mesh.CenterCoor[self.EltTip[i], 0] <= 0 and self.mesh.CenterCoor[self.EltTip[i], 1] >= 0:
-                self.ZeroVertex[i] = 1
-            elif self.mesh.CenterCoor[self.EltTip[i], 0] >= 0 and self.mesh.CenterCoor[self.EltTip[i], 1] >= 0:
-                self.ZeroVertex[i] = 0
 
         # assigning nan for cells which are not in the fracture yet
         self.Tarrival = np.full((self.mesh.NumberOfElts,), np.nan, dtype=np.float64)
@@ -355,8 +346,9 @@ class Fracture():
                                                                                             self.Tarrival[
                                                                                             self.EltChannel]) ** 0.5
         # calculate leaked off volume for the tip cells by integrating Carter leak off expression (see Dontsov and Peirce, 2008)
-        self.Leakedoff[self.EltTip] = 2 * solid.Cprime[self.EltTip] * VolumeIntegral(self.EltTip, self.alpha, self.l,
-                                                                                     self.mesh, 'Lk', solid,
+        self.Leakedoff[self.EltTip] = 2 * solid.Cprime[self.EltTip] * VolumeIntegral(self.EltTip,
+                                                                                     self.alpha[self.EltTip],
+                                                                                     self.l[self.EltTip],                                                                                     self.mesh, 'Lk', solid,
                                                                                      self.muPrime, self.v)
 
         # saving initial state of fracture and properties if the output flags are set
@@ -447,14 +439,14 @@ class Fracture():
 
         """
         # list of points where fracture front is intersecting the grid lines. 
-        intrsct1 = np.zeros((2, len(self.l)))
-        intrsct2 = np.zeros((2, len(self.l)))
+        intrsct1 = np.zeros((2, len(self.EltTip)))
+        intrsct2 = np.zeros((2, len(self.EltTip)))
 
-        for i in range(0, len(self.l)):
-            if self.alpha[i] != 0 and self.alpha[i] != math.pi / 2: # for angles greater than zero and less than 90 deg
+        for i in range(0, len(self.EltTip)):
+            if self.alpha[self.EltTip][i] != 0 and self.alpha[self.EltTip][i] != math.pi / 2: # for angles greater than zero and less than 90 deg
                 # calculate intercept on y axis and gradient
-                yIntrcpt = self.l[i] / math.cos(math.pi / 2 - self.alpha[i])
-                grad = -1 / math.tan(self.alpha[i])
+                yIntrcpt = self.l[self.EltTip][i] / math.cos(math.pi / 2 - self.alpha[self.EltTip][i])
+                grad = -1 / math.tan(self.alpha[self.EltTip][i])
 
                 if Pdistance(0, self.mesh.hy, grad, yIntrcpt) <= 0:
                     # one point on top horizontal line of the cell
@@ -472,60 +464,79 @@ class Fracture():
                     intrsct2[0, i] = self.mesh.hx
                     intrsct2[1, i] = yIntrcpt + grad * self.mesh.hx
 
-            if self.alpha[i] == 0:
-                intrsct1[0, i] = self.l[i]
+            if self.alpha[self.EltTip][i] == 0:
+                intrsct1[0, i] = self.l[self.EltTip][i]
                 intrsct1[1, i] = self.mesh.hy
-                intrsct2[0, i] = self.l[i]
+                intrsct2[0, i] = self.l[self.EltTip][i]
                 intrsct2[1, i] = 0
 
-            if self.alpha[i] == math.pi / 2:
+            if self.alpha[self.EltTip][i] == math.pi / 2:
                 intrsct1[0, i] = 0
-                intrsct1[1, i] = self.l[i]
+                intrsct1[1, i] = self.l[self.EltTip][i]
                 intrsct2[0, i] = self.mesh.hx
-                intrsct2[1, i] = self.l[i]
+                intrsct2[1, i] = self.l[self.EltTip][i]
 
-            if self.ZeroVertex[i] == 0:
+            if self.ZeroVertex[self.EltTip[i]] == 0:
                 intrsct1[0, i] = intrsct1[0, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 0]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 0]
                 intrsct1[1, i] = intrsct1[1, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 1]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 1]
                 intrsct2[0, i] = intrsct2[0, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 0]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 0]
                 intrsct2[1, i] = intrsct2[1, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 1]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 1]
 
-            if self.ZeroVertex[i] == 1:
+            if self.ZeroVertex[self.EltTip[i]] == 1:
                 intrsct1[0, i] = -intrsct1[0, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 0]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 0]
                 intrsct1[1, i] = intrsct1[1, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 1]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 1]
                 intrsct2[0, i] = -intrsct2[0, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 0]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 0]
                 intrsct2[1, i] = intrsct2[1, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 1]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 1]
 
-            if self.ZeroVertex[i] == 3:
+            if self.ZeroVertex[self.EltTip[i]] == 3:
                 intrsct1[0, i] = intrsct1[0, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 0]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 0]
                 intrsct1[1, i] = -intrsct1[1, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 1]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 1]
                 intrsct2[0, i] = intrsct2[0, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 0]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 0]
                 intrsct2[1, i] = -intrsct2[1, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 1]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 1]
 
-            if self.ZeroVertex[i] == 2:
+            if self.ZeroVertex[self.EltTip[i]] == 2:
                 intrsct1[0, i] = -intrsct1[0, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 0]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 0]
                 intrsct1[1, i] = -intrsct1[1, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 1]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 1]
                 intrsct2[0, i] = -intrsct2[0, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 0]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 0]
                 intrsct2[1, i] = -intrsct2[1, i] + self.mesh.VertexCoor[
-                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[i]], 1]
+                    self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 1]
+
+        # x = np.zeros((1,len(self.EltRibbon)), )
+        # y = np.zeros((1,len(self.EltRibbon)), )
+        # for i in range(0, len(self.EltRibbon)):
+        #     if self.ZeroVertex[self.EltRibbon[i]] == 0:
+        #         x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 0], 0] + self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
+        #         y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 0], 1] + self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
+        #     elif self.ZeroVertex[self.EltRibbon[i]] == 1:
+        #         x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 1], 0] - self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
+        #         y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 1], 1] + self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
+        #     elif self.ZeroVertex[self.EltRibbon[i]] == 2:
+        #         x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 2], 0] - self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
+        #         y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 2], 1] - self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
+        #     elif self.ZeroVertex[self.EltRibbon[i]] == 3:
+        #         x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 3], 0] + self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
+        #         y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 3], 1] - self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
 
         tmp = np.transpose(intrsct1)
         tmp = np.hstack((tmp, np.transpose(intrsct2)))
+        # tmp2= np.hstack((np.transpose(x),np.transpose(y)))
+        # tmp2= np.hstack((tmp2,self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon, self.ZeroVertex[self.EltRibbon]]]))
+        # tmp = np.vstack((tmp,tmp2))
         if evol:
             self.FractEvol = np.vstack((self.FractEvol, tmp))
             fig = PlotMeshFractureTrace(self.mesh, self.EltTip, self.EltChannel, self.EltRibbon, self.FractEvol[:, 0:2],

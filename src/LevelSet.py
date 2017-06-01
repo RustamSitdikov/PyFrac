@@ -11,7 +11,7 @@ See the LICENSE.TXT file for more details.
 import numpy as np
 
 
-from src.Utility import Neighbors
+from src.Utility import *
 
 
 def SolveFMM(InitlevelSet, EltRibbon, EltChannel, mesh):
@@ -28,9 +28,10 @@ def SolveFMM(InitlevelSet, EltRibbon, EltChannel, mesh):
         Does not return anything. The InitlevelSet is updated in place.
     """
 
-    Alive = np.copy(EltChannel)
+    # for Elements radialy outward from ribbon cells
+    Alive = np.copy(EltRibbon)
     NarrowBand = np.copy(EltRibbon)
-    FarAway = np.delete(range(mesh.NumberOfElts), np.intersect1d(range(mesh.NumberOfElts), EltChannel, None))
+    FarAway = np.delete(range(mesh.NumberOfElts), np.intersect1d(range(mesh.NumberOfElts), EltRibbon, None))
     # the maximum distance any point can have from another in the current mesh. This distance is used to detect the
     # cells that are not yet traversed, i.e. having infinity distance
     maxdist = 4 * (mesh.Lx ** 2 + mesh.Ly ** 2) ** 0.5
@@ -69,10 +70,58 @@ def SolveFMM(InitlevelSet, EltRibbon, EltChannel, mesh):
         NarrowBand = np.delete(NarrowBand, np.where(NarrowBand == Smallest))
 
 
+    # for elements radialy inward from ribbon cells. The sign of the level set values(tip asymptote) in the ribbon cells
+    # is inverted to run the fast marching algorithm. The sign is finally inverted back to assign the value in the level
+    # set to be returned.
+    RibbonInwardElts = np.delete(EltChannel, np.intersect1d(EltChannel, EltRibbon, None))
+
+    positive_levelSet = 1e10 * np.ones((mesh.NumberOfElts,), np.float64)
+    positive_levelSet[EltRibbon] = -InitlevelSet[EltRibbon]
+    Alive = np.copy(EltRibbon)
+    NarrowBand = np.copy(EltRibbon)
+    FarAway = np.copy(RibbonInwardElts)
+
+    while NarrowBand.size > 0:
+
+        Smallest = int(NarrowBand[positive_levelSet[NarrowBand.astype(int)].argmin()])
+        neighbors = mesh.NeiElements[Smallest]
+
+        for neighbor in neighbors:
+            if not neighbor in Alive:
+
+                if neighbor in FarAway:
+                    NarrowBand = np.append(NarrowBand, neighbor)
+                    FarAway = np.delete(FarAway, np.where(FarAway == neighbor))
+
+                NeigxMin = min(positive_levelSet[mesh.NeiElements[neighbor, 0]],
+                               positive_levelSet[mesh.NeiElements[neighbor, 1]])
+                NeigyMin = min(positive_levelSet[mesh.NeiElements[neighbor, 2]],
+                               positive_levelSet[mesh.NeiElements[neighbor, 3]])
+                beta = mesh.hx / mesh.hy
+                delT = NeigyMin - NeigxMin
+                theta = (mesh.hx ** 2 * (
+                    1 + beta ** 2) - beta ** 2 * delT ** 2) ** 0.5  # it goes to nan for fully horizontal or
+                # fully vertical perpendiculars on the front
+
+                if not np.isnan((NeigxMin + beta * NeigyMin + theta) / (1 + beta ** 2)):
+                    positive_levelSet[neighbor] = (NeigxMin + beta ** 2 * NeigyMin + theta) / (1 + beta ** 2)
+                else:  # the angle is either 0 or 90 degrees
+                    # vertical propagation direction.
+                    if NeigxMin > maxdist:  # used to check if very large value (level set value for unevaluated elements)
+                        positive_levelSet[neighbor] = NeigyMin + mesh.hy
+                    # horizontal propagation direction.
+                    if NeigyMin > maxdist:
+                        positive_levelSet[neighbor] = NeigxMin + mesh.hx
+
+        Alive = np.append(Alive, Smallest)
+        NarrowBand = np.delete(NarrowBand, np.where(NarrowBand == Smallest))
+
+    # assigning adjusted value to the level set to be returned
+    InitlevelSet[RibbonInwardElts] = -positive_levelSet[RibbonInwardElts]
 # -----------------------------------------------------------------------------------------------------------------------
 
 
-def reconstruct_front(dist, EltChannel, mesh):
+def reconstruct_front(dist, EltChannel, EltRibbon, mesh):
     """
     Track the fracture front, the length of the perpendicular drawn on the fracture and the angle inscribed by the
     perpendicular.
@@ -81,26 +130,53 @@ def reconstruct_front(dist, EltChannel, mesh):
         dist (ndarray-float): the signed distance of the cells from the fracture front
         EltChannel (ndarray-int): list of Channel elements
         mesh (CartesianMesh object): the mesh of the fracture
+        
+    Returns:
+        ndarray-int:            new tip elements
+        ndarray-float:          the length of the perpendicular from the fracture front to the zero vertex
+        ndarray-float:          the angle inscribed by the perpendicular from the fracture front to the zero vertex
+        ndarray-int:            the type of the elements (1 for channel elements, 2 for tip elements, 0 for rest)
+        ndarray-int:            Vertex from which the perpendicular is drawn (can have value from 0 to 3, where
+                                0 signify bottom left, 1 signifying bottom right, 2 signifying top right and 3
+                                signifying top left vertex)
     """
 
     # Elements that are not in channel
-    EltRest = np.delete(range(mesh.NumberOfElts), np.intersect1d(range(mesh.NumberOfElts), EltChannel, None))
+    EltRest = np.delete(range(mesh.NumberOfElts), EltChannel, None)
     ElmntTip = np.asarray([], int)
-    l = np.asarray([])
-    alpha = np.asarray([])
+    l = np.zeros((mesh.NumberOfElts,), dtype=np.float64)
+    alpha = np.zeros((mesh.NumberOfElts,), dtype=np.float64)
+    # finding distance from front for ribbon elements also. It will be used to check the propagation condition.
+    EltRest = np.append(EltRest, EltRibbon)
+    zeroVrtx = 255 * np.ones((mesh.NumberOfElts,), int)     # Vertex from where the perpendicular is drawn (255 for
+                                                            # unitialized)
 
     for i in range(0, len(EltRest)):
         neighbors = np.asarray(Neighbors(EltRest[i], mesh.nx, mesh.ny))
 
-        minx = min(dist[neighbors[0]], dist[neighbors[1]])
-        miny = min(dist[neighbors[2]], dist[neighbors[3]])
+        # minx = min(dist[neighbors[0]], dist[neighbors[1]])
+        # miny = min(dist[neighbors[2]], dist[neighbors[3]])
+        if dist[neighbors[0]] <= dist[neighbors[1]]:
+            minx = dist[neighbors[0]]
+            drctx = -1
+        else:
+            minx = dist[neighbors[1]]
+            drctx = 1
+
+        if dist[neighbors[2]] <= dist[neighbors[3]]:
+            miny = dist[neighbors[2]]
+            drcty = -1
+        else:
+            miny = dist[neighbors[3]]
+            drcty = 1
         # distance of the vertex (zero vertex, i.e. rotated distance) of the current cell from the front
         Pdis = -(minx + miny) / 2
 
         # if the vertex distance is positive, meaning the fracture has passed the vertex
         if Pdis >= 0:
-            ElmntTip = np.append(ElmntTip, EltRest[i])
-            l = np.append(l, Pdis)
+            if not EltRest[i] in EltRibbon:
+                ElmntTip = np.append(ElmntTip, EltRest[i])
+            l[EltRest[i]] = Pdis
 
             # calculate angle imposed by the perpendicular on front (see Peirce & Detournay 2008)
             delDist = miny - minx
@@ -123,25 +199,35 @@ def reconstruct_front(dist, EltChannel, mesh):
 
             # checks to remove numerical noise in angle calculation
             if a2 >= 0 and a2 <= np.pi / 2:
-                alpha = np.append(alpha, a2)
+                alpha[EltRest[i]] = a2
             elif a1 >= 0 and a1 <= np.pi / 2:
-                alpha = np.append(alpha, a1)
+                alpha[EltRest[i]] = a1
             elif a2 < 0 and a2 > -1e-6:
-                alpha = np.append(alpha, 0)
+                alpha[EltRest[i]] = 0
             elif a2 > np.pi / 2 and a2 < np.pi / 2 + 1e-6:
-                alpha = np.append(alpha, np.pi / 2)
+                alpha[EltRest[i]] = np.pi / 2
             elif a1 < 0 and a1 > -1e-6:
-                alpha = np.append(alpha, 0)
+                alpha[EltRest[i]] = 0
             elif a1 > np.pi / 2 and a1 < np.pi / 2 + 1e-6:
-                alpha = np.append(alpha, np.pi / 2)
+                alpha[EltRest[i]] = np.pi / 2
             else:
-                alpha = np.append(alpha, np.nan)
+                alpha[EltRest[i]] = np.nan
+
+            # assigning zerot vertex
+            if drctx < 0 and drcty < 0:
+                zeroVrtx[EltRest[i]] = 0
+            if drctx > 0 and drcty < 0:
+                zeroVrtx[EltRest[i]] = 1
+            if drctx < 0 and drcty > 0:
+                zeroVrtx[EltRest[i]] = 3
+            if drctx > 0 and drcty > 0:
+                zeroVrtx[EltRest[i]] = 2
 
     CellStatusNew = np.zeros((mesh.NumberOfElts), int)
     CellStatusNew[EltChannel] = 1
     CellStatusNew[ElmntTip] = 2
 
-    return (ElmntTip, l, alpha, CellStatusNew)
+    return ElmntTip, l, alpha, CellStatusNew, zeroVrtx
 
 
 # -----------------------------------------------------------------------------------------------------------------------
@@ -164,9 +250,6 @@ def UpdateLists(EltsChannel, EltsTipNew, FillFrac, levelSet, mesh):
         (ndarray-int):                  new tip elements list
         (ndarray-int):                  new crack elements list
         (ndarray-int):                  new ribbon elements list
-        (ndarray-int):                  list specifying the zero vertex of the tip cells. (can have value from 0 to 3,
-                                        where 0 signify bottom left, 1 signifying bottom right, 2 signifying top right
-                                        and 3 signifying top left vertex)
         (ndarray-int):                  specifies which region each element currently belongs to
     """
 
@@ -194,7 +277,6 @@ def UpdateLists(EltsChannel, EltsTipNew, FillFrac, levelSet, mesh):
     eltsChannel = np.append(EltsChannel, newEltChannel)
     eltsCrack = np.append(eltsChannel, eltsTip)
     eltsRibbon = np.array([], int)
-    zeroVrtx = np.zeros((len(eltsTip),), int)  # Vertex from where the perpendicular is drawn
 
     # All the inner cells neighboring tip cells are added to ribbon cells
     for i in range(0, len(eltsTip)):
@@ -202,27 +284,14 @@ def UpdateLists(EltsChannel, EltsTipNew, FillFrac, levelSet, mesh):
 
         if levelSet[neighbors[0]] <= levelSet[neighbors[1]]:
             eltsRibbon = np.append(eltsRibbon, neighbors[0])
-            drctx = -1
         else:
             eltsRibbon = np.append(eltsRibbon, neighbors[1])
-            drctx = 1
 
         if levelSet[neighbors[2]] <= levelSet[neighbors[3]]:
             eltsRibbon = np.append(eltsRibbon, neighbors[2])
-            drcty = -1
         else:
             eltsRibbon = np.append(eltsRibbon, neighbors[3])
-            drcty = 1
 
-        # Assigning zero vertex according to the direction of propagation
-        if drctx < 0 and drcty < 0:
-            zeroVrtx[i] = 0
-        if drctx > 0 and drcty < 0:
-            zeroVrtx[i] = 1
-        if drctx < 0 and drcty > 0:
-            zeroVrtx[i] = 3
-        if drctx > 0 and drcty > 0:
-            zeroVrtx[i] = 2
 
     # Remove repetitions in the ribbon cells
     eltsRibbon = np.unique(eltsRibbon)
@@ -235,7 +304,7 @@ def UpdateLists(EltsChannel, EltsTipNew, FillFrac, levelSet, mesh):
     CellStatusNew[eltsTip] = 2
     CellStatusNew[eltsRibbon] = 3
 
-    return eltsChannel, eltsTip, eltsCrack, eltsRibbon, zeroVrtx, CellStatusNew
+    return eltsChannel, eltsTip, eltsCrack, eltsRibbon, CellStatusNew
 
     # -----------------------------------------------------------------------------------------------------------------------
 

@@ -326,14 +326,14 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
         Fracture object:            fracture after advancing time step. 
     """
     # Initialization of the signed distance in the ribbon element - by inverting the tip asymptotics
-    sgndDist_k = 1e10 * np.ones((Fr_lstTmStp.mesh.NumberOfElts,), float)  # Initializing the cells with maximum
+    sgndDist_k = 1e10 * np.ones((Fr_lstTmStp.mesh.NumberOfElts,), float)  # Initializing the cells with extremely large
     # float value. (algorithm requires inf)
-    sgndDist_k[Fr_lstTmStp.EltChannel] = 0  # for cells inside the fracture
 
     # Tip asymptote inversion
     sgndDist_k[Fr_lstTmStp.EltRibbon] = -TipAsymInversion(w_k,
                                                           Fr_lstTmStp,
                                                           Material_properties,
+                                                          Fluid_properties,
                                                           sim_parameters,
                                                           timeStep)
 
@@ -342,8 +342,7 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
         exitstatus = 7
         return exitstatus, None
 
-    # SOLVE EIKONAL eq via Fast Marching Method starting from the element adjacent to the ribbon elements
-    # (i.e. the tip elements of the last time step)
+    # SOLVE EIKONAL eq via Fast Marching Method starting to get the distance from tip for each cell.
     SolveFMM(sgndDist_k,
              Fr_lstTmStp.EltRibbon,
              Fr_lstTmStp.EltChannel,
@@ -359,13 +358,22 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
 
     # gets the new tip elements, along with the length and angle of the perpendiculars drawn on front (also containing
     # the elements which are fully filled after the front is moved outward)
-    (EltsTipNew, l_k, alpha_k, CellStatus) = reconstruct_front(sgndDist_k,
+    (EltsTipNew, l_k, alpha_k, CellStatus, zrVertx_k) = reconstruct_front(sgndDist_k,
                                                                Fr_lstTmStp.EltChannel,
+                                                               Fr_lstTmStp.EltRibbon,
                                                                Fr_lstTmStp.mesh)
+    # l_kcpy = 0*np.copy(l_k)
+    # l_kcpy[Fr_lstTmStp.EltRibbon] = l_k[Fr_lstTmStp.EltRibbon]
+    # l_kcpy[EltsTipNew] = l_k[EltsTipNew]
+    # plt.matshow(np.reshape(l_kcpy,(Fr_lstTmStp.mesh.ny,Fr_lstTmStp.mesh.nx)))
+    # plt.show()
+    # plt.matshow(np.reshape(alpha_k, (Fr_lstTmStp.mesh.ny, Fr_lstTmStp.mesh.nx)))
+    # plt.show()
+
 
     # If the angle and length of the perpendicular are not correct
     nan = np.logical_or(np.isnan(alpha_k), np.isnan(l_k))
-    if nan.any() or (l_k < 0).any() or (alpha_k < 0).any() or (alpha_k > np.pi / 2).any():
+    if nan.any() or (l_k[EltsTipNew] < 0).any() or (alpha_k[EltsTipNew] < 0).any() or (alpha_k[EltsTipNew] > np.pi / 2).any():
         exitstatus = 3
         return exitstatus, None
 
@@ -388,8 +396,8 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
 
     # Calculate filling fraction of the tip cells for the current fracture position
     FillFrac_k = VolumeIntegral(EltsTipNew,
-                                alpha_k,
-                                l_k,
+                                alpha_k[EltsTipNew],
+                                l_k[EltsTipNew],
                                 Fr_lstTmStp.mesh,
                                 'A',
                                 Material_properties,
@@ -410,7 +418,6 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
      EltTip_k,
      EltCrack_k,
      EltRibbon_k,
-     zrVertx_k,
      CellStatus_k) = UpdateLists(Fr_lstTmStp.EltChannel,
                                  EltsTipNew,
                                  FillFrac_k,
@@ -444,8 +451,8 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
         # Calculate average width in the tip cells by integrating tip asymptote. Width of stagnant cells are calculated
         # using the stress intensity factor (see Dontsov and Peirce, JFM RAPIDS, 2017)
         wTip = VolumeIntegral(EltsTipNew,
-                              alpha_k,
-                              l_k,
+                              alpha_k[EltsTipNew],
+                              l_k[EltsTipNew],
                               Fr_lstTmStp.mesh,
                               sim_parameters.tipAsymptote,
                               Material_properties,
@@ -456,8 +463,8 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
     else:
         # Calculate average width in the tip cells by integrating tip asymptote
         wTip = VolumeIntegral(EltsTipNew,
-                              alpha_k,
-                              l_k,
+                              alpha_k[EltsTipNew],
+                              l_k[EltsTipNew],
                               Fr_lstTmStp.mesh,
                               sim_parameters.tipAsymptote,
                               Material_properties,
@@ -553,8 +560,8 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
                                              Fr_kplus1.w[Fr_kplus1.EltCrack])
     Fr_kplus1.sgndDist = sgndDist_k
 
-    Fr_kplus1.alpha = alpha_k[partlyFilledTip]
-    Fr_kplus1.l = l_k[partlyFilledTip]
+    Fr_kplus1.alpha = alpha_k
+    Fr_kplus1.l = l_k
     Fr_kplus1.v = Vel_k[partlyFilledTip]
 
     Fr_kplus1.InCrack = InCrack_k
