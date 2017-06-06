@@ -33,7 +33,10 @@ Mesh = CartesianMesh(3, 3, 41, 41)
 # solid properties
 nu = 0.4
 Eprime = 3.3e10 / (1 - nu ** 2)
-K_Ic = 1e6
+K_Ic = np.full((Mesh.NumberOfElts,), 1e6, dtype=np.float64)
+stressed_layer = np.where(abs(Mesh.CenterCoor[:,1]) > 1.5-Mesh.hx/2)[0]
+K_Ic[stressed_layer] = 10e6
+
 sigma0 = 0 * 1e6
 Solid = MaterialProperties(Eprime, K_Ic, 0., sigma0, Mesh)
 
@@ -47,8 +50,8 @@ Fluid = FluidProperties(1.1e-3, Mesh, turbulence=False)
 
 # simulation properties
 simulProp = SimulationParameters(tip_asymptote="U",
-                                 output_time_period=0.0005,
-                                 plot_figure=False,
+                                 output_time_period=0.005,
+                                 plot_figure=True,
                                  save_to_disk=False,
                                  out_file_address=".\\Data\\TurbLamTough",
                                  plot_analytical=True,
@@ -56,7 +59,7 @@ simulProp = SimulationParameters(tip_asymptote="U",
 
 
 # initializing fracture
-initRad = 0.8 # initial radius of fracture
+initRad = 1.3 # initial radius of fracture
 Fr = Fracture(Mesh, Fluid, Solid) # create fracture object
 Fr.initialize_radial_Fracture(initRad,
                               'radius',

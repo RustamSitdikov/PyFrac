@@ -325,43 +325,64 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
                                     
         Fracture object:            fracture after advancing time step. 
     """
-    # Initialization of the signed distance in the ribbon element - by inverting the tip asymptotics
-    sgndDist_k = 1e10 * np.ones((Fr_lstTmStp.mesh.NumberOfElts,), float)  # Initializing the cells with extremely large
-    # float value. (algorithm requires inf)
 
-    # Tip asymptote inversion
-    sgndDist_k[Fr_lstTmStp.EltRibbon] = -TipAsymInversion(w_k,
-                                                          Fr_lstTmStp,
-                                                          Material_properties,
-                                                          Fluid_properties,
-                                                          sim_parameters,
-                                                          timeStep)
 
-    # if tip inversion returns nan
-    if np.isnan(sgndDist_k[Fr_lstTmStp.EltRibbon]).any():
-        exitstatus = 7
-        return exitstatus, None
+    front_data = (Fr_lstTmStp.l, Fr_lstTmStp.alpha, Fr_lstTmStp.ZeroVertex)
+    norm_lvlSet = 1
+    itr = 1
+    # norm_list = np.ones((60,),dtype=np.float64)
+    norm_list = np.asarray([1,1,1,1], np.float64)
+    while norm_lvlSet > 3e-3 and itr < 60:
 
-    # SOLVE EIKONAL eq via Fast Marching Method starting to get the distance from tip for each cell.
-    SolveFMM(sgndDist_k,
-             Fr_lstTmStp.EltRibbon,
-             Fr_lstTmStp.EltChannel,
-             Fr_lstTmStp.mesh)
+        # Initialization of the signed distance in the ribbon element - by inverting the tip asymptotics
+        sgndDist_k = 1e10 * np.ones((Fr_lstTmStp.mesh.NumberOfElts,), float)  # Initializing the cells with extremely
+        # large float value. (algorithm requires inf)
 
-    # if some elements remain unevaluated by fast marching method. It happens with unrealistic fracture geometry.
-    # todo: not satisfied with why this happens. need re-examining
-    if max(sgndDist_k) == 1e10:
-        exitstatus = 2
-        return exitstatus, None
+        # Tip asymptote inversion
+        sgndDist_k[Fr_lstTmStp.EltRibbon] = -TipAsymInversion(w_k,
+                                                              Fr_lstTmStp,
+                                                              front_data,
+                                                              Material_properties,
+                                                              Fluid_properties,
+                                                              sim_parameters,
+                                                              timeStep)
 
-    print('Calculating the filling fraction of tip elements with the new fracture front location...')
+        # if tip inversion returns nan
+        if np.isnan(sgndDist_k[Fr_lstTmStp.EltRibbon]).any():
+            exitstatus = 7
+            return exitstatus, None
 
-    # gets the new tip elements, along with the length and angle of the perpendiculars drawn on front (also containing
-    # the elements which are fully filled after the front is moved outward)
-    (EltsTipNew, l_k, alpha_k, CellStatus, zrVertx_k) = reconstruct_front(sgndDist_k,
-                                                               Fr_lstTmStp.EltChannel,
-                                                               Fr_lstTmStp.EltRibbon,
-                                                               Fr_lstTmStp.mesh)
+        # SOLVE EIKONAL eq via Fast Marching Method starting to get the distance from tip for each cell.
+        SolveFMM(sgndDist_k,
+                 Fr_lstTmStp.EltRibbon,
+                 Fr_lstTmStp.EltChannel,
+                 Fr_lstTmStp.mesh)
+
+        # if some elements remain unevaluated by fast marching method. It happens with unrealistic fracture geometry.
+        # todo: not satisfied with why this happens. need re-examining
+        if max(sgndDist_k) == 1e10:
+            exitstatus = 2
+            return exitstatus, None
+
+        l_k_last = np.copy(front_data[0])
+        alpha_k_last = np.copy(front_data[1])
+
+        # gets the new tip elements, along with the length and angle of the perpendiculars drawn on front (also containing
+        # the elements which are fully filled after the front is moved outward)
+        (EltsTipNew, l_k, alpha_k, CellStatus, zrVertx_k) = reconstruct_front(sgndDist_k,
+                                                                              Fr_lstTmStp.EltChannel,
+                                                                              Fr_lstTmStp.EltRibbon,
+                                                                              Fr_lstTmStp.mesh)
+
+        # Fr_tmp = copy.deepcopy(Fr_lstTmStp)
+        # Fr_tmp.l = l_k
+        # Fr_tmp.alpha = alpha_k
+        # Fr_tmp.ZeroVertex = zrVertx_k
+        # Fr_tmp.EltTip = EltsTipNew
+        # fig = Fr_tmp.plot_fracture("complete", "footPrint")
+        # plt.show()
+#        front_data = (l_k, alpha_k, zrVertx_k)
+
     # l_kcpy = 0*np.copy(l_k)
     # l_kcpy[Fr_lstTmStp.EltRibbon] = l_k[Fr_lstTmStp.EltRibbon]
     # l_kcpy[EltsTipNew] = l_k[EltsTipNew]
@@ -371,11 +392,21 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
     # plt.show()
 
 
-    # If the angle and length of the perpendicular are not correct
-    nan = np.logical_or(np.isnan(alpha_k), np.isnan(l_k))
-    if nan.any() or (l_k[EltsTipNew] < 0).any() or (alpha_k[EltsTipNew] < 0).any() or (alpha_k[EltsTipNew] > np.pi / 2).any():
-        exitstatus = 3
-        return exitstatus, None
+        # If the angle and length of the perpendicular are not correct
+        nan = np.logical_or(np.isnan(alpha_k), np.isnan(l_k))
+        if nan.any() or (l_k[EltsTipNew] < 0).any() or (alpha_k[EltsTipNew] < 0).any() or (alpha_k[EltsTipNew] > np.pi / 2).any():
+            exitstatus = 3
+            return exitstatus, None
+
+        front_data = (l_k, alpha_k, zrVertx_k)
+        norm_lvlSet = np.linalg.norm(1 - abs(l_k_last[Fr_lstTmStp.EltRibbon]/l_k[Fr_lstTmStp.EltRibbon]))
+        if norm_lvlSet in norm_list: #and norm_lvlSet < 1.0:
+            break
+        norm_list[(itr-1)%4] = norm_lvlSet
+        # norm_list[itr - 1] = norm_lvlSet
+        itr += 1
+        print("itr "+repr(itr)+" norm "+repr(norm_list))
+
 
     # check if any of the tip cells has a neighbor outside the grid, i.e. fracture has reached the end of the grid.
     tipNeighb = Fr_lstTmStp.mesh.NeiElements[EltsTipNew, :]
@@ -393,7 +424,7 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
     # todo: not accurate on the first iteration. needed to be checked
     Vel_k = -(sgndDist_k[EltsTipNew] - Fr_lstTmStp.sgndDist[EltsTipNew]) / timeStep
 
-
+    print('Calculating the filling fraction of tip elements with the new fracture front location...')
     # Calculate filling fraction of the tip cells for the current fracture position
     FillFrac_k = VolumeIntegral(EltsTipNew,
                                 alpha_k[EltsTipNew],

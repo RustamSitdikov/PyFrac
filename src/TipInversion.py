@@ -132,7 +132,7 @@ def FindBracket_dist(w, frac, mat_prop, fluid_prop, Kprime, dt, ResFunc):
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-def TipAsymInversion(w, frac, matProp, fluidProp, simParmtrs, dt=None):
+def TipAsymInversion(w, frac, frontData, matProp, fluidProp, simParmtrs, dt=None):
     """ 
     Evaluate distance from the front using tip assymptotics of the given regime, given the fracture width in the ribbon
     cells.
@@ -161,7 +161,9 @@ def TipAsymInversion(w, frac, matProp, fluidProp, simParmtrs, dt=None):
     elif simParmtrs.tipAsymptote == 'K':
         return w[frac.EltRibbon] ** 2 * (matProp.Eprime / matProp.Kprime[[frac.EltRibbon]]) ** 2
 
-    Kprime = toughness(frac.EltRibbon, frac.l, frac.alpha, frac.ZeroVertex, matProp.KprimeFunc, frac.mesh)
+    (l, alpha, zrVertx) = frontData
+
+    Kprime = toughness_closest_tip(frac.EltRibbon, l, alpha, zrVertx, matProp.KprimeFunc, frac.mesh)
 
     (moving, a, b) = FindBracket_dist(w, frac, matProp, fluidProp, Kprime, dt, ResFunc)
     dist = -frac.sgndDist[frac.EltRibbon]
@@ -181,6 +183,7 @@ def TipAsymInversion(w, frac, matProp, fluidProp, simParmtrs, dt=None):
 
 def StressIntensityFactor(w, lvlSetData, EltTip, EltRibbon, stagnant, mesh, Eprime):
     """ See Donstov & Pierce Comput. Methods Appl. Mech. Engrn. 2017"""
+
     KIPrime = np.zeros((EltTip.size,), float)
     for i in range(0, len(EltTip)):
         if stagnant[i]:
@@ -207,7 +210,7 @@ def StressIntensityFactor(w, lvlSetData, EltTip, EltRibbon, stagnant, mesh, Epri
 
     return KIPrime
 
-def toughness(Elts, l, alpha, zero_vrtx, Kprime, mesh):
+def toughness_closest_tip(Elts, l, alpha, zero_vrtx, Kprime, mesh):
     """
     This function gives the toughness at the closest tip for the given cells.
     
@@ -241,4 +244,5 @@ def toughness(Elts, l, alpha, zero_vrtx, Kprime, mesh):
             coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 3], 0] + l[Elts[i]] * np.cos(alpha[Elts[i]])
             coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 3], 1] - l[Elts[i]] * np.sin(alpha[Elts[i]])
 
-    return Kprime.ev(coor[:,0],coor[:,1])
+    # return Kprime.ev(coor[:,1],coor[:,0])
+    return Kprime(coor[:, 0], coor[:, 1])

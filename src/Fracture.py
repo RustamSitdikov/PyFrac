@@ -516,27 +516,27 @@ class Fracture():
                 intrsct2[1, i] = -intrsct2[1, i] + self.mesh.VertexCoor[
                     self.mesh.Connectivity[self.EltTip[i], self.ZeroVertex[self.EltTip[i]]], 1]
 
-        # x = np.zeros((1,len(self.EltRibbon)), )
-        # y = np.zeros((1,len(self.EltRibbon)), )
-        # for i in range(0, len(self.EltRibbon)):
-        #     if self.ZeroVertex[self.EltRibbon[i]] == 0:
-        #         x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 0], 0] + self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
-        #         y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 0], 1] + self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
-        #     elif self.ZeroVertex[self.EltRibbon[i]] == 1:
-        #         x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 1], 0] - self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
-        #         y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 1], 1] + self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
-        #     elif self.ZeroVertex[self.EltRibbon[i]] == 2:
-        #         x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 2], 0] - self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
-        #         y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 2], 1] - self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
-        #     elif self.ZeroVertex[self.EltRibbon[i]] == 3:
-        #         x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 3], 0] + self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
-        #         y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 3], 1] - self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
+        x = np.zeros((1,len(self.EltRibbon)), )
+        y = np.zeros((1,len(self.EltRibbon)), )
+        for i in range(0, len(self.EltRibbon)):
+            if self.ZeroVertex[self.EltRibbon[i]] == 0:
+                x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 0], 0] + self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
+                y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 0], 1] + self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
+            elif self.ZeroVertex[self.EltRibbon[i]] == 1:
+                x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 1], 0] - self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
+                y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 1], 1] + self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
+            elif self.ZeroVertex[self.EltRibbon[i]] == 2:
+                x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 2], 0] - self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
+                y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 2], 1] - self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
+            elif self.ZeroVertex[self.EltRibbon[i]] == 3:
+                x[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 3], 0] + self.l[self.EltRibbon[i]] * np.cos(self.alpha[self.EltRibbon[i]])
+                y[0,i] = self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon[i], 3], 1] - self.l[self.EltRibbon[i]] * np.sin(self.alpha[self.EltRibbon[i]])
 
         tmp = np.transpose(intrsct1)
         tmp = np.hstack((tmp, np.transpose(intrsct2)))
-        # tmp2= np.hstack((np.transpose(x),np.transpose(y)))
-        # tmp2= np.hstack((tmp2,self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon, self.ZeroVertex[self.EltRibbon]]]))
-        # tmp = np.vstack((tmp,tmp2))
+        tmp2= np.hstack((np.transpose(x),np.transpose(y)))
+        tmp2= np.hstack((tmp2,self.mesh.VertexCoor[self.mesh.Connectivity[self.EltRibbon, self.ZeroVertex[self.EltRibbon]]]))
+        tmp = np.vstack((tmp,tmp2))
         if evol:
             self.FractEvol = np.vstack((self.FractEvol, tmp))
             fig = PlotMeshFractureTrace(self.mesh, self.EltTip, self.EltChannel, self.EltRibbon, self.FractEvol[:, 0:2],

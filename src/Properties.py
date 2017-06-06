@@ -39,6 +39,12 @@ class MaterialProperties:
             if Toughness.size == Mesh.NumberOfElts:  # check if size equal to the mesh size
                 self.K1c = Toughness
                 self.Kprime = (32 / math.pi) ** 0.5 * Toughness
+                # hrzntl = np.where(abs(Mesh.CenterCoor[:, 1]) < 1e-12)[0]
+                # vrtcl = np.where(abs(Mesh.CenterCoor[:, 0]) < 1e-12)[0]
+                # self.KprimeFunc = interpolate.RectBivariateSpline(Mesh.CenterCoor[vrtcl, 1],
+                #                                                   Mesh.CenterCoor[hrzntl, 0],
+                #                                                   np.reshape(self.Kprime, (Mesh.ny, Mesh.nx)))
+                self.KprimeFunc = Kprime_func
             else:
                 # error
                 raise SystemExit('Error in the size of Toughness input ')
@@ -46,11 +52,12 @@ class MaterialProperties:
         else:
             self.K1c = Toughness * np.ones((Mesh.NumberOfElts,), float)
             self.Kprime = (32 / math.pi) ** 0.5 * Toughness * np.ones((Mesh.NumberOfElts,), float)
-            hrzntl = np.where(abs(Mesh.CenterCoor[:, 1]) < 1e-12)[0]
-            vrtcl  = np.where(abs(Mesh.CenterCoor[:, 0]) < 1e-12)[0]
-            self.KprimeFunc = interpolate.RectBivariateSpline(Mesh.CenterCoor[vrtcl,1],
-                                                              Mesh.CenterCoor[hrzntl,0],
-                                                              np.reshape(self.Kprime,(Mesh.ny,Mesh.nx)))
+            # hrzntl = np.where(abs(Mesh.CenterCoor[:, 1]) < 1e-12)[0]
+            # vrtcl  = np.where(abs(Mesh.CenterCoor[:, 0]) < 1e-12)[0]
+            # self.KprimeFunc = interpolate.RectBivariateSpline(Mesh.CenterCoor[vrtcl,1],
+            #                                                   Mesh.CenterCoor[hrzntl,0],
+            #                                                   np.reshape(self.Kprime,(Mesh.ny,Mesh.nx)))
+            self.KprimeFunc = Kprime_func
 
         if isinstance(Cl, np.ndarray):  # check if float or ndarray
             if Cl.size == Mesh.NumberOfElts:  # check if size equal to the mesh size
@@ -256,3 +263,10 @@ class SimulationParameters:
             self.lastSavedFile = 0
 
 # ----------------------------------------------------------------------------------------------------------------------
+def Kprime_func(x,y):
+
+    toughness = np.full((x.size,), 1e6, dtype=np.float64)
+    highTough = np.where(abs(y) > 1.5)[0]
+    toughness[highTough] = 10e6
+
+    return (32 / math.pi) ** 0.5 * toughness
