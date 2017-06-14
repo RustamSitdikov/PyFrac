@@ -347,8 +347,8 @@ class Fracture():
                                                                                             self.EltChannel]) ** 0.5
         # calculate leaked off volume for the tip cells by integrating Carter leak off expression (see Dontsov and Peirce, 2008)
         self.Leakedoff[self.EltTip] = 2 * solid.Cprime[self.EltTip] * VolumeIntegral(self.EltTip,
-                                                                                     self.alpha[self.EltTip],
-                                                                                     self.l[self.EltTip],                                                                                     self.mesh, 'Lk', solid,
+                                                                                     self.alpha,
+                                                                                     self.l,                                                                                     self.mesh, 'Lk', solid,
                                                                                      self.muPrime, self.v)
 
         # saving initial state of fracture and properties if the output flags are set

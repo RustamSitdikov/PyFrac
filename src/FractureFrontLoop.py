@@ -327,12 +327,19 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
     """
 
 
-    front_data = (Fr_lstTmStp.l, Fr_lstTmStp.alpha, Fr_lstTmStp.ZeroVertex)
+
     norm_lvlSet = 1
     itr = 1
+    l_k = np.copy(Fr_lstTmStp.l)
+    alpha_k = np.copy(Fr_lstTmStp.alpha)
+    zrVertx_k = np.copy(Fr_lstTmStp.ZeroVertex)
+    front_data = (l_k, alpha_k, zrVertx_k)
     # norm_list = np.ones((60,),dtype=np.float64)
     norm_list = np.asarray([1,1,1,1], np.float64)
-    while norm_lvlSet > 3e-3 and itr < 60:
+
+    if Fr_lstTmStp.time > 8173:
+        norm_list = np.asarray([1, 1, 1, 1], np.float64)
+    while norm_lvlSet > 1e-3 and itr < 60:
 
         # Initialization of the signed distance in the ribbon element - by inverting the tip asymptotics
         sgndDist_k = 1e10 * np.ones((Fr_lstTmStp.mesh.NumberOfElts,), float)  # Initializing the cells with extremely
@@ -364,8 +371,8 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
             exitstatus = 2
             return exitstatus, None
 
-        l_k_last = np.copy(front_data[0])
-        alpha_k_last = np.copy(front_data[1])
+        l_k_last = np.copy(l_k)
+        alpha_k_last = np.copy(alpha_k)
 
         # gets the new tip elements, along with the length and angle of the perpendiculars drawn on front (also containing
         # the elements which are fully filled after the front is moved outward)
@@ -373,6 +380,18 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
                                                                               Fr_lstTmStp.EltChannel,
                                                                               Fr_lstTmStp.EltRibbon,
                                                                               Fr_lstTmStp.mesh)
+
+        # if Fr_lstTmStp.time > 1816:
+        #     PrintDomain(alpha_k, Fr_lstTmStp.mesh, np.arange(0,Fr_lstTmStp.mesh.NumberOfElts))
+        #     for i in range(0,len(Fr_lstTmStp.EltRibbon)):
+        #         for j in range(0,4):
+        #             if Fr_lstTmStp.mesh.NeiElements[Fr_lstTmStp.EltRibbon[i],j] in Fr_lstTmStp.EltRibbon:
+        #                 if abs(alpha_k[Fr_lstTmStp.EltRibbon[i]]/alpha_k[Fr_lstTmStp.mesh.NeiElements[Fr_lstTmStp.EltRibbon[i],j]] -1.0) > 1.0:
+        #                     Fr_lstTmStp.plot_fracture("complete","footPrint", identify=[Fr_lstTmStp.EltRibbon[i],Fr_lstTmStp.mesh.NeiElements[Fr_lstTmStp.EltRibbon[i],j]])
+        #                     plt.show()
+
+
+        front_data = (l_k, alpha_k, zrVertx_k)
 
         # Fr_tmp = copy.deepcopy(Fr_lstTmStp)
         # Fr_tmp.l = l_k
@@ -398,10 +417,10 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
             exitstatus = 3
             return exitstatus, None
 
-        front_data = (l_k, alpha_k, zrVertx_k)
-        norm_lvlSet = np.linalg.norm(1 - abs(l_k_last[Fr_lstTmStp.EltRibbon]/l_k[Fr_lstTmStp.EltRibbon]))
-        if norm_lvlSet in norm_list: #and norm_lvlSet < 1.0:
-            break
+        non_zro = np.where(alpha_k[Fr_lstTmStp.EltRibbon]!=0.0)[0]
+        norm_lvlSet = np.linalg.norm(1 - abs(alpha_k_last[Fr_lstTmStp.EltRibbon][non_zro]/alpha_k[Fr_lstTmStp.EltRibbon][non_zro]))
+        # if norm_lvlSet in norm_list: #and norm_lvlSet < 1.0:
+        #     break
         norm_list[(itr-1)%4] = norm_lvlSet
         # norm_list[itr - 1] = norm_lvlSet
         itr += 1
@@ -427,8 +446,8 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
     print('Calculating the filling fraction of tip elements with the new fracture front location...')
     # Calculate filling fraction of the tip cells for the current fracture position
     FillFrac_k = VolumeIntegral(EltsTipNew,
-                                alpha_k[EltsTipNew],
-                                l_k[EltsTipNew],
+                                alpha_k,
+                                l_k,
                                 Fr_lstTmStp.mesh,
                                 'A',
                                 Material_properties,
@@ -482,8 +501,8 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
         # Calculate average width in the tip cells by integrating tip asymptote. Width of stagnant cells are calculated
         # using the stress intensity factor (see Dontsov and Peirce, JFM RAPIDS, 2017)
         wTip = VolumeIntegral(EltsTipNew,
-                              alpha_k[EltsTipNew],
-                              l_k[EltsTipNew],
+                              alpha_k,
+                              l_k,
                               Fr_lstTmStp.mesh,
                               sim_parameters.tipAsymptote,
                               Material_properties,
@@ -494,8 +513,8 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
     else:
         # Calculate average width in the tip cells by integrating tip asymptote
         wTip = VolumeIntegral(EltsTipNew,
-                              alpha_k[EltsTipNew],
-                              l_k[EltsTipNew],
+                              alpha_k,
+                              l_k,
                               Fr_lstTmStp.mesh,
                               sim_parameters.tipAsymptote,
                               Material_properties,

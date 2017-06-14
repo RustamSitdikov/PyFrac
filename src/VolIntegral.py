@@ -21,9 +21,9 @@ Functions to calculate tip volumes, given the propagation regime
 
 # imports
 import numpy as np
-from importlib.machinery import SourceFileLoader
 import matplotlib.pyplot as plt
 from scipy.optimize import brentq
+from src.TipInversion import Kprime_closest_tip
 
 from src.TipInversion import f
 
@@ -178,36 +178,37 @@ def VolumeIntegral(EltTip, alpha, l, mesh, regime, mat_prop, muPrime, Vel, stagn
         stagnant = np.zeros((alpha.size,), bool)
         KIPrime = np.zeros((alpha.size,), float)
 
-    Kprime = mat_prop.Kprime[EltTip]
+    Kprime = Kprime_closest_tip(EltTip, l, alpha, mesh)
+
     muPrimeTip = muPrime[EltTip]
     Cprime = mat_prop.Cprime[EltTip]
 
-    volume = np.zeros((len(l),), float)
-    for i in range(0, len(l)):
+    volume = np.zeros((len(EltTip),), float)
+    for i in range(0, len(EltTip)):
 
-        if abs(alpha[i]) < 1e-8:
-            if l[i] <= mesh.hx:
-                volume[i] = Area(l[i], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i],
+        if abs(alpha[EltTip[i]]) < 1e-8:
+            if l[EltTip[i]] <= mesh.hx:
+                volume[i] = Area(l[EltTip[i]], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i],
                                  Vel[i], stagnant[i], KIPrime[i]) * mesh.hy
             else:
-                volume[i] = (Area(l[i], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i],
-                                  Vel[i], stagnant[i], KIPrime[i]) - Area(l[i] - mesh.hx, regime, Kprime[i],
+                volume[i] = (Area(l[EltTip[i]], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i],
+                                  Vel[i], stagnant[i], KIPrime[i]) - Area(l[EltTip[i]] - mesh.hx, regime, Kprime[i],
                                   mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i], stagnant[i], KIPrime[i])) * mesh.hy
 
-        elif abs(alpha[i] - np.pi / 2) < 1e-8:
-            if l[i] <= mesh.hy:
-                volume[i] = Area(l[i], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i], stagnant[i],
+        elif abs(alpha[EltTip[i]] - np.pi / 2) < 1e-8:
+            if l[EltTip[i]] <= mesh.hy:
+                volume[i] = Area(l[EltTip[i]], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i], stagnant[i],
                                  KIPrime[i]) * mesh.hx
             else:
-                volume[i] = (Area(l[i], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i], stagnant[i],
-                                  KIPrime[i]) - Area(l[i] - mesh.hy, regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i],
+                volume[i] = (Area(l[EltTip[i]], regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i], stagnant[i],
+                                  KIPrime[i]) - Area(l[EltTip[i]] - mesh.hy, regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i],
                                                      Cprime[i], Vel[i], stagnant[i], KIPrime[i])) * mesh.hx
         else:
-            yIntrcpt = l[i] / np.cos(np.pi / 2 - alpha[i])
-            grad = -1 / np.tan(alpha[i])
-            m = 1 / (np.sin(alpha[i]) * np.cos(alpha[i]))
+            yIntrcpt = l[EltTip[i]] / np.cos(np.pi / 2 - alpha[EltTip[i]])
+            grad = -1 / np.tan(alpha[EltTip[i]])
+            m = 1 / (np.sin(alpha[EltTip[i]]) * np.cos(alpha[EltTip[i]]))
 
-            TriVol = VolumeTriangle(l[i], m, regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i],
+            TriVol = VolumeTriangle(l[EltTip[i]], m, regime, Kprime[i], mat_prop.Eprime, muPrimeTip[i], Cprime[i], Vel[i],
                                     stagnant[i], KIPrime[i])
 
             lUp = Pdistance(0, mesh.hy, grad, yIntrcpt)  # distance of the front from the upper left vertex of the grid cell

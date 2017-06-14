@@ -98,7 +98,7 @@ def FindBracket_dist(w, frac, mat_prop, fluid_prop, Kprime, dt, ResFunc):
 
     stagnant = np.where(
         # propagation condition
-        Kprime * (-frac.sgndDist[frac.EltRibbon]) ** 0.5 / (mat_prop.Eprime * w[frac.EltRibbon]) > 1)
+        Kprime * (-frac.sgndDist[frac.EltRibbon]) ** 0.5 / (mat_prop.Eprime * w[frac.EltRibbon]) > 1)[0]
     moving = np.arange(frac.EltRibbon.shape[0])[~np.in1d(frac.EltRibbon, frac.EltRibbon[stagnant])]
 
     a = -frac.sgndDist[frac.EltRibbon[moving]] * (1 + 1e5 * np.finfo(float).eps)
@@ -163,7 +163,8 @@ def TipAsymInversion(w, frac, frontData, matProp, fluidProp, simParmtrs, dt=None
 
     (l, alpha, zrVertx) = frontData
 
-    Kprime = toughness_closest_tip(frac.EltRibbon, l, alpha, zrVertx, matProp.KprimeFunc, frac.mesh)
+    Kprime = Kprime_closest_tip(frac.EltRibbon, l, alpha, frac.mesh, KprimeFunc=matProp.KprimeFunc, zero_vrtx=zrVertx)
+
 
     (moving, a, b) = FindBracket_dist(w, frac, matProp, fluidProp, Kprime, dt, ResFunc)
     dist = -frac.sgndDist[frac.EltRibbon]
@@ -210,7 +211,7 @@ def StressIntensityFactor(w, lvlSetData, EltTip, EltRibbon, stagnant, mesh, Epri
 
     return KIPrime
 
-def toughness_closest_tip(Elts, l, alpha, zero_vrtx, Kprime, mesh):
+def Kprime_closest_tip(Elts, l, alpha, mesh, KprimeFunc=None, anisotropic=True, zero_vrtx=None):
     """
     This function gives the toughness at the closest tip for the given cells.
     
@@ -225,6 +226,9 @@ def toughness_closest_tip(Elts, l, alpha, zero_vrtx, Kprime, mesh):
     Return:
         ndarray-float:                  toughness at the front for the given elements
     """
+
+    if anisotropic:
+        return (32 / math.pi) ** 0.5 * (1e6 + 1e6*np.sin(alpha[Elts]))
 
     coor = np.zeros((len(Elts),2),)
 
@@ -245,4 +249,4 @@ def toughness_closest_tip(Elts, l, alpha, zero_vrtx, Kprime, mesh):
             coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 3], 1] - l[Elts[i]] * np.sin(alpha[Elts[i]])
 
     # return Kprime.ev(coor[:,1],coor[:,0])
-    return Kprime(coor[:, 0], coor[:, 1])
+    return KprimeFunc(coor[:, 0], coor[:, 1])

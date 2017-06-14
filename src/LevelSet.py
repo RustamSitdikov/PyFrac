@@ -181,7 +181,13 @@ def reconstruct_front(dist, EltChannel, EltRibbon, mesh):
             # calculate angle imposed by the perpendicular on front (see Peirce & Detournay 2008)
             delDist = miny - minx
             beta = mesh.hx / mesh.hy
+
+
             theta = (mesh.hx ** 2 * (1 + beta ** 2) - beta ** 2 * delDist ** 2) ** 0.5
+
+            if np.isnan((mesh.hx ** 2 * (1 + beta ** 2) - beta ** 2 * delDist ** 2) ** 0.5):
+                theta = (abs(mesh.hx ** 2 * (1 + beta ** 2) - beta ** 2 * delDist ** 2)) ** 0.5
+
             # angle calculate with inverse of cosine trigonometric function
             a1 = np.arccos((theta + beta ** 2 * delDist) / (mesh.hx * (1 + beta ** 2)))
             # angle calculate with inverse of sine trigonometric function
