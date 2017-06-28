@@ -159,11 +159,15 @@ def TipAsymInversion(w, frac, frontData, matProp, fluidProp, simParmtrs, dt=None
     elif simParmtrs.tipAsymptote == 'MK':
         ResFunc = TipAsym_MKTransition_Res
     elif simParmtrs.tipAsymptote == 'K':
-        return w[frac.EltRibbon] ** 2 * (matProp.Eprime / matProp.Kprime[[frac.EltRibbon]]) ** 2
+        (l, alpha, zrVertx) = frontData
+        # Kprime = Kprime_closest_tip(frac.EltRibbon, l, alpha, frac.mesh, KprimeFunc=matProp.KprimeFunc,
+        #                             zero_vrtx=zrVertx)
+        Kprime = (32 / math.pi) ** 0.5 * (1e6)
+        return w[frac.EltRibbon] ** 2 * (matProp.Eprime / Kprime) ** 2
 
-    (l, alpha, zrVertx) = frontData
+    (l, alpha, zrVertx, Sgnd_dist) = frontData
 
-    Kprime = Kprime_closest_tip(frac.EltRibbon, l, alpha, frac.mesh, KprimeFunc=matProp.KprimeFunc, zero_vrtx=zrVertx)
+    Kprime = Kprime_closest_tip(frac.EltRibbon, l, alpha, frac.mesh, KprimeFunc=matProp.KprimeFunc, zero_vrtx=zrVertx, sgnd_dist=Sgnd_dist)
 
 
     (moving, a, b) = FindBracket_dist(w, frac, matProp, fluidProp, Kprime, dt, ResFunc)
@@ -211,7 +215,7 @@ def StressIntensityFactor(w, lvlSetData, EltTip, EltRibbon, stagnant, mesh, Epri
 
     return KIPrime
 
-def Kprime_closest_tip(Elts, l, alpha, mesh, KprimeFunc=None, anisotropic=True, zero_vrtx=None):
+def Kprime_closest_tip(Elts, l, alpha, mesh, KprimeFunc=None, anisotropic=True, zero_vrtx=None, sgnd_dist=None, Tip=False ):
     """
     This function gives the toughness at the closest tip for the given cells.
     
@@ -227,26 +231,54 @@ def Kprime_closest_tip(Elts, l, alpha, mesh, KprimeFunc=None, anisotropic=True, 
         ndarray-float:                  toughness at the front for the given elements
     """
 
-    if anisotropic:
-        return (32 / math.pi) ** 0.5 * (1e6 + 1e6*np.sin(alpha[Elts]))
 
     coor = np.zeros((len(Elts),2),)
 
     # obtaining the coordinates of front from the perpendicular drawn on the fracture front from the vertex of the given
     # elements
-    for i in range(0,len(Elts)):
-        if zero_vrtx[Elts[i]] == 0:
-            coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 0], 0] + l[Elts[i]] * np.cos(alpha[Elts[i]])
-            coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 0], 1] + l[Elts[i]] * np.sin(alpha[Elts[i]])
-        elif zero_vrtx[Elts[i]] == 1:
-            coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 1], 0] - l[Elts[i]] * np.cos(alpha[Elts[i]])
-            coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 1], 1] + l[Elts[i]] * np.sin(alpha[Elts[i]])
-        elif zero_vrtx[Elts[i]] == 2:
-            coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 2], 0] - l[Elts[i]] * np.cos(alpha[Elts[i]])
-            coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 2], 1] - l[Elts[i]] * np.sin(alpha[Elts[i]])
-        elif zero_vrtx[Elts[i]] == 3:
-            coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 3], 0] + l[Elts[i]] * np.cos(alpha[Elts[i]])
-            coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 3], 1] - l[Elts[i]] * np.sin(alpha[Elts[i]])
+    # if Tip:
+    #     for i in range(0,len(Elts)):
+    #         if zero_vrtx[Elts[i]] == 0:
+    #             coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 0], 0] + l[Elts[i]] * np.cos(alpha[Elts[i]])
+    #             coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 0], 1] + l[Elts[i]] * np.sin(alpha[Elts[i]])
+    #         elif zero_vrtx[Elts[i]] == 1:
+    #             coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 1], 0] - l[Elts[i]] * np.cos(alpha[Elts[i]])
+    #             coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 1], 1] + l[Elts[i]] * np.sin(alpha[Elts[i]])
+    #         elif zero_vrtx[Elts[i]] == 2:
+    #             coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 2], 0] - l[Elts[i]] * np.cos(alpha[Elts[i]])
+    #             coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 2], 1] - l[Elts[i]] * np.sin(alpha[Elts[i]])
+    #         elif zero_vrtx[Elts[i]] == 3:
+    #             coor[i, 0] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 3], 0] + l[Elts[i]] * np.cos(alpha[Elts[i]])
+    #             coor[i, 1] = mesh.VertexCoor[mesh.Connectivity[Elts[i], 3], 1] - l[Elts[i]] * np.sin(alpha[Elts[i]])
 
+    if Tip:
+        return (32 / math.pi) ** 0.5 * (
+            1e6 + 0.3e6 * np.sin(alpha[Elts]))  # )*np.ones((len(Elts),),)#+ 1e6*np.sin(alpha[Elts]))
+    else:
+        dist = -sgnd_dist
+        alpha = np.zeros((Elts.size,),dtype=np.float64)
+        for i in range(0, len(Elts)):
+            if zero_vrtx[Elts[i]] == 0:
+                alpha[i] = np.arccos((dist[Elts[i]]-dist[mesh.NeiElements[Elts[i],1]])/mesh.hx)
+
+            elif zero_vrtx[Elts[i]] == 1:
+                alpha[i] = np.arccos((dist[Elts[i]]-dist[mesh.NeiElements[Elts[i],0]])/mesh.hx)
+
+            elif zero_vrtx[Elts[i]] == 2:
+                alpha[i] = np.arccos((dist[Elts[i]]-dist[mesh.NeiElements[Elts[i],0]])/mesh.hx)
+
+            elif zero_vrtx[Elts[i]] == 3:
+                alpha[i] = np.arccos((dist[Elts[i]]-dist[mesh.NeiElements[Elts[i],1]])/mesh.hx)
+
+            if abs(dist[mesh.NeiElements[Elts[i],0]]/dist[mesh.NeiElements[Elts[i],1]]-1) < 1e-7:
+                alpha[i] = np.pi/2
+
+        return (32 / math.pi) ** 0.5 * (
+            1e6 + 0.3e6 * np.sin(alpha))  # )*np.ones((len(Elts),),)#+ 1e6*np.sin(alpha[Elts]))
+
+    # if anisotropic:
+    #
+    #     return (32 / math.pi) ** 0.5 * (
+    #     1e6 + 0.2e6 * np.sin(alpha))  # )*np.ones((len(Elts),),)#+ 1e6*np.sin(alpha[Elts]))
     # return Kprime.ev(coor[:,1],coor[:,0])
-    return KprimeFunc(coor[:, 0], coor[:, 1])
+    # return KprimeFunc(coor[:, 0], coor[:, 1])

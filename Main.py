@@ -28,12 +28,12 @@ from src.Properties import *
 from src.FractureFrontLoop import *
 
 # creating mesh
-Mesh = CartesianMesh(600, 600, 41, 41)
+Mesh = CartesianMesh(6000, 6000, 41, 41)
 
 # solid properties
 nu = 0.4
 Eprime = 3.3e10 / (1 - nu ** 2)
-K_Ic = np.full((Mesh.NumberOfElts,), 0, dtype=np.float64)
+K_Ic = np.full((Mesh.NumberOfElts,), 1e6, dtype=np.float64)
 # stressed_layer = np.where(abs(Mesh.CenterCoor[:,1]) > 15-Mesh.hx/2)[0]
 # K_Ic[stressed_layer] = 5e6
 
@@ -56,11 +56,11 @@ simulProp = SimulationParameters(tip_asymptote="U",
                                  out_file_address=".\\Data\\TurbLamTough",
                                  plot_analytical=True,
                                  tmStp_prefactor=0.4,
-                                 final_time=10000)
+                                 final_time=100000000)
 
 
 # initializing fracture
-initRad = 120 # initial radius of fracture
+initRad = 1500 # initial radius of fracture
 Fr = Fracture(Mesh, Fluid, Solid) # create fracture object
 Fr.initialize_radial_Fracture(initRad,
                               'radius',

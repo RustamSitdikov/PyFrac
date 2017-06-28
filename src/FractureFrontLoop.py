@@ -333,11 +333,12 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
     l_k = np.copy(Fr_lstTmStp.l)
     alpha_k = np.copy(Fr_lstTmStp.alpha)
     zrVertx_k = np.copy(Fr_lstTmStp.ZeroVertex)
-    front_data = (l_k, alpha_k, zrVertx_k)
+    sgndDist_k = np.copy(Fr_lstTmStp.sgndDist)
+    front_data = (l_k, alpha_k, zrVertx_k, sgndDist_k)
     # norm_list = np.ones((60,),dtype=np.float64)
     norm_list = np.asarray([1,1,1,1], np.float64)
 
-    if Fr_lstTmStp.time > 8173:
+    if Fr_lstTmStp.time > 1626900:
         norm_list = np.asarray([1, 1, 1, 1], np.float64)
     while norm_lvlSet > 1e-3 and itr < 60:
 
@@ -365,12 +366,15 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
                  Fr_lstTmStp.EltChannel,
                  Fr_lstTmStp.mesh)
 
+        # if Fr_lstTmStp.time>7000.0:
+        #     plot_as_matrix(sgndDist_k, Fr_lstTmStp.mesh)
         # if some elements remain unevaluated by fast marching method. It happens with unrealistic fracture geometry.
         # todo: not satisfied with why this happens. need re-examining
         if max(sgndDist_k) == 1e10:
             exitstatus = 2
             return exitstatus, None
 
+        sgndDist_km1 = np.copy(sgndDist_k)
         l_k_last = np.copy(l_k)
         alpha_k_last = np.copy(alpha_k)
 
@@ -391,7 +395,7 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
         #                     plt.show()
 
 
-        front_data = (l_k, alpha_k, zrVertx_k)
+        front_data = (l_k, alpha_k, zrVertx_k, sgndDist_k)
 
         # Fr_tmp = copy.deepcopy(Fr_lstTmStp)
         # Fr_tmp.l = l_k
@@ -509,7 +513,8 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
                               Fr_lstTmStp.muPrime,
                               Vel_k,
                               stagnant,
-                              KIPrime) / Fr_lstTmStp.mesh.EltArea
+                              KIPrime
+                              ) / Fr_lstTmStp.mesh.EltArea
     else:
         # Calculate average width in the tip cells by integrating tip asymptote
         wTip = VolumeIntegral(EltsTipNew,
@@ -519,7 +524,9 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
                               sim_parameters.tipAsymptote,
                               Material_properties,
                               Fr_lstTmStp.muPrime,
-                              Vel_k) / Fr_lstTmStp.mesh.EltArea
+                              Vel_k,
+                              dist=sgndDist_k,
+                              zr_vrtx=zrVertx_k) / Fr_lstTmStp.mesh.EltArea
 
     # # check if the tip volume has gone into negative
     # # todo: !!! Hack: if the evaluated tip width is negative but greater than 1e-4 times the mean width, it is ignored
@@ -615,12 +622,16 @@ def injection_extended_footprint(w_k, Fr_lstTmStp, C, timeStep, Qin, Material_pr
     Fr_kplus1.v = Vel_k[partlyFilledTip]
 
     Fr_kplus1.InCrack = InCrack_k
-
+    Fr_kplus1.CellStatus = np.zeros((Fr_kplus1.mesh.NumberOfElts), int)
+    Fr_kplus1.CellStatus[Fr_kplus1.EltChannel] = 1
+    Fr_kplus1.CellStatus[Fr_kplus1.EltTip] = 2
+    Fr_kplus1.CellStatus[Fr_kplus1.EltRibbon] = 3
     # # check if the tip has laminar flow, to be consistent with tip asymptote.
     # ReNumb, check = turbulence_check_tip(vel, Fr_kplus1, Fluid_properties, return_ReyNumb=True)
     # # plot Reynold's number
     # plot_Reynolds_number(Fr_kplus1, ReNumb, 1)
 
+    # plot_as_matrix(alpha_k,Fr_lstTmStp.mesh)
     exitstatus = 1
     return exitstatus, Fr_kplus1
 
@@ -663,11 +674,13 @@ def output(Fr_lstTmStp, Fr_advanced, simulation_parameters, material_properties,
                 fig = Fr_advanced.plot_fracture('complete',
                                                 'footPrint',
                                                 analytical=R,
-                                                mat_Properties=material_properties)
+                                                mat_Properties=material_properties
+                                                )
             else:
                 fig = Fr_advanced.plot_fracture('complete',
                                                 'footPrint',
-                                                mat_Properties = material_properties)
+                                                mat_Properties = material_properties
+                                                )
             plt.show()
 
         # save fracture to disk

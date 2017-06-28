@@ -52,9 +52,9 @@ def SolveFMM(InitlevelSet, EltRibbon, EltChannel, mesh):
                 NeigyMin = min(InitlevelSet[mesh.NeiElements[neighbor, 2]], InitlevelSet[mesh.NeiElements[neighbor, 3]])
                 beta = mesh.hx / mesh.hy
                 delT = NeigyMin - NeigxMin
-                theta = (mesh.hx ** 2 * (
-                1 + beta ** 2) - beta ** 2 * delT ** 2) ** 0.5  # it goes to nan for fully horizontal or
-                # fully vertical perpendiculars on the front
+
+                theta = (mesh.hx ** 2 * (1 + beta ** 2) - beta ** 2 * delT ** 2) ** 0.5  # it goes to nan for fully
+                # horizontal or fully vertical perpendiculars on the front
 
                 if not np.isnan((NeigxMin + beta * NeigyMin + theta) / (1 + beta ** 2)):
                     InitlevelSet[neighbor] = (NeigxMin + beta ** 2 * NeigyMin + theta) / (1 + beta ** 2)
@@ -65,7 +65,10 @@ def SolveFMM(InitlevelSet, EltRibbon, EltChannel, mesh):
                     # horizontal propagation direction.
                     if NeigyMin > maxdist:
                         InitlevelSet[neighbor] = NeigxMin + mesh.hx
-
+                # if abs(InitlevelSet[mesh.NeiElements[neighbor, 0]]/InitlevelSet[mesh.NeiElements[neighbor, 1]]-1)<1e-8:
+                #     InitlevelSet[neighbor] = NeigyMin + mesh.hy
+                # elif abs(InitlevelSet[mesh.NeiElements[neighbor, 2]]/InitlevelSet[mesh.NeiElements[neighbor, 3]]-1)<1e-8:
+                #     InitlevelSet[neighbor] = NeigxMin + mesh.hx
         Alive = np.append(Alive, Smallest)
         NarrowBand = np.delete(NarrowBand, np.where(NarrowBand == Smallest))
 
@@ -73,7 +76,10 @@ def SolveFMM(InitlevelSet, EltRibbon, EltChannel, mesh):
     # for elements radialy inward from ribbon cells. The sign of the level set values(tip asymptote) in the ribbon cells
     # is inverted to run the fast marching algorithm. The sign is finally inverted back to assign the value in the level
     # set to be returned.
-    RibbonInwardElts = np.delete(EltChannel, np.intersect1d(EltChannel, EltRibbon, None))
+
+    RibbonInwardElts = np.copy(EltChannel)
+    for i in range(len(EltRibbon)):
+        RibbonInwardElts = np.delete(RibbonInwardElts, np.where(RibbonInwardElts==EltRibbon[i])[0])
 
     positive_levelSet = 1e10 * np.ones((mesh.NumberOfElts,), np.float64)
     positive_levelSet[EltRibbon] = -InitlevelSet[EltRibbon]
@@ -99,9 +105,8 @@ def SolveFMM(InitlevelSet, EltRibbon, EltChannel, mesh):
                                positive_levelSet[mesh.NeiElements[neighbor, 3]])
                 beta = mesh.hx / mesh.hy
                 delT = NeigyMin - NeigxMin
-                theta = (mesh.hx ** 2 * (
-                    1 + beta ** 2) - beta ** 2 * delT ** 2) ** 0.5  # it goes to nan for fully horizontal or
-                # fully vertical perpendiculars on the front
+
+                theta = (mesh.hx ** 2 * (1 + beta ** 2) - beta ** 2 * delT ** 2) ** 0.5
 
                 if not np.isnan((NeigxMin + beta * NeigyMin + theta) / (1 + beta ** 2)):
                     positive_levelSet[neighbor] = (NeigxMin + beta ** 2 * NeigyMin + theta) / (1 + beta ** 2)
@@ -113,6 +118,10 @@ def SolveFMM(InitlevelSet, EltRibbon, EltChannel, mesh):
                     if NeigyMin > maxdist:
                         positive_levelSet[neighbor] = NeigxMin + mesh.hx
 
+                # if abs(positive_levelSet[mesh.NeiElements[neighbor, 0]]/positive_levelSet[mesh.NeiElements[neighbor, 1]]-1)<1e-8:
+                #     positive_levelSet[neighbor] = NeigyMin + mesh.hy
+                # elif abs(positive_levelSet[mesh.NeiElements[neighbor, 2]]/positive_levelSet[mesh.NeiElements[neighbor, 3]]-1)<1e-8:
+                #     positive_levelSet[neighbor] = NeigxMin + mesh.hx
         Alive = np.append(Alive, Smallest)
         NarrowBand = np.delete(NarrowBand, np.where(NarrowBand == Smallest))
 
@@ -154,16 +163,17 @@ def reconstruct_front(dist, EltChannel, EltRibbon, mesh):
     for i in range(0, len(EltRest)):
         neighbors = np.asarray(Neighbors(EltRest[i], mesh.nx, mesh.ny))
 
+
         # minx = min(dist[neighbors[0]], dist[neighbors[1]])
         # miny = min(dist[neighbors[2]], dist[neighbors[3]])
-        if dist[neighbors[0]] <= dist[neighbors[1]]:
+        if dist[neighbors[0]] < dist[neighbors[1]]:
             minx = dist[neighbors[0]]
             drctx = -1
         else:
             minx = dist[neighbors[1]]
             drctx = 1
 
-        if dist[neighbors[2]] <= dist[neighbors[3]]:
+        if dist[neighbors[2]] < dist[neighbors[3]]:
             miny = dist[neighbors[2]]
             drcty = -1
         else:
@@ -195,7 +205,10 @@ def reconstruct_front(dist, EltChannel, EltRibbon, mesh):
             a2 = np.arcsin(sinalpha)
             # angle calculated with tan
             # if minx<0 and miny<0:
-            # a3 = np.arccos(abs(minx-miny)/(mesh.hx**2+mesh.hy**2)**0.5)-np.arctan(mesh.hy/mesh.hx)
+            if (mesh.hx ** 2 * (1 + beta ** 2) - beta ** 2 * delDist ** 2)<0.0:
+                a1 = np.pi/4
+                # a3 = np.arccos(abs(minx-miny)/(mesh.hx**2+mesh.hy**2)**0.5)-np.arctan(mesh.hy/mesh.hx)
+                # print(repr(a3))
 
             # !!!Hack. this check of zero or 90 degree angle works better
             if abs(1 - dist[neighbors[0]] / dist[neighbors[1]]) < 1e-8:
@@ -286,14 +299,14 @@ def UpdateLists(EltsChannel, EltsTipNew, FillFrac, levelSet, mesh):
 
     # All the inner cells neighboring tip cells are added to ribbon cells
     for i in range(0, len(eltsTip)):
-        neighbors = np.asarray(Neighbors(eltsTip[i], mesh.nx, mesh.ny))
+        neighbors = mesh.NeiElements[eltsTip[i]] #np.asarray(Neighbors(eltsTip[i], mesh.nx, mesh.ny))
 
-        if levelSet[neighbors[0]] <= levelSet[neighbors[1]]:
+        if levelSet[neighbors[0]] < levelSet[neighbors[1]]:# -1 < 0:
             eltsRibbon = np.append(eltsRibbon, neighbors[0])
         else:
             eltsRibbon = np.append(eltsRibbon, neighbors[1])
 
-        if levelSet[neighbors[2]] <= levelSet[neighbors[3]]:
+        if levelSet[neighbors[2]] < levelSet[neighbors[3]]:# -1 < 0:
             eltsRibbon = np.append(eltsRibbon, neighbors[2])
         else:
             eltsRibbon = np.append(eltsRibbon, neighbors[3])
@@ -304,6 +317,18 @@ def UpdateLists(EltsChannel, EltsTipNew, FillFrac, levelSet, mesh):
     for i in range(0, len(eltsTip)):
         eltsRibbon = np.delete(eltsRibbon, np.where(eltsRibbon == eltsTip[i]))
 
+    to_delete = np.asarray([])
+    for i in range(0, len(eltsRibbon)):
+        neighbors = mesh.NeiElements[eltsRibbon[i]]
+        enclosing = np.append(neighbors, np.asarray(
+            [neighbors[2] - 1, neighbors[2] + 1, neighbors[3] - 1, neighbors[3] + 1]))
+        if sum(np.in1d(enclosing,eltsRibbon))< 2:
+            to_delete = np.append(to_delete, np.where(eltsRibbon == eltsRibbon[i])[0])
+    eltsRibbon = np.delete(eltsRibbon, to_delete)
+
+    for i in range(0,len(eltsRibbon)):
+        if not eltsRibbon[i] in eltsChannel:
+            print("not in ribbon")
     # Cells status list store the status of all the cells in the domain
     CellStatusNew = np.zeros((mesh.NumberOfElts), int)
     CellStatusNew[eltsChannel] = 1
